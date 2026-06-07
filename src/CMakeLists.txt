@@ -1,5 +1,6 @@
 add_library(
     rcj_ww_vision_lib
+    blob_sender.cpp
     rcj_vision.cpp
 )
 

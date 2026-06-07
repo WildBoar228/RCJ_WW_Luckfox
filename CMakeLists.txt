@@ -31,6 +31,8 @@ add_subdirectory(src)
 
 if(BUILD_DESKTOP_DEBUG)
     target_compile_definitions(${PROJECT_NAME} PRIVATE DESKTOP_DEBUG)
+    target_compile_options(${PROJECT_NAME} PRIVATE "-fsanitize=address,leak,undefined")
+    target_link_options(${PROJECT_NAME} PRIVATE "-fsanitize=address,leak,undefined")
 
     enable_testing()
     add_subdirectory(tests)

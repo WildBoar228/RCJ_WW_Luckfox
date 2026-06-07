@@ -3,7 +3,7 @@
 
 #include "geometry.hpp"
 
-namespace ww_geom {
+namespace ww_vision {
 
     namespace utils {
 
@@ -21,6 +21,10 @@ namespace ww_geom {
             return p1.y < p2.y ? -1 : 1;
         }
         return 0;
+    }
+
+    constexpr Deg AngleTo(Point from, Point to) {
+        return Rad(std::atan2(to.y - from.y, to.x - from.x));
     }
 
     constexpr int Comp(const Segment& s1, const Segment& s2) {
@@ -116,7 +120,7 @@ namespace ww_geom {
         }
     }
 
-    constexpr int DistToPolygon(Segment ray, const Blob& blob) {
+    constexpr int CalcPolygonDist(Segment ray, const Blob& blob) {
         Point intersect;
         int min_dist = 1000;
         for (int i = 0; i < blob.vert_cnt; ++i){
@@ -132,4 +136,4 @@ namespace ww_geom {
         return min_dist;
     }
 
-} // namespace ww_geom
+} // namespace ww_vision

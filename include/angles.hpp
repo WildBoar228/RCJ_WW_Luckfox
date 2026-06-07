@@ -4,7 +4,7 @@
 #include <cmath>
 #include <iostream>
 
-namespace ww_geom {
+namespace ww_vision {
 
     static constexpr double kPi = 3.14159265358979323846;
     static constexpr double kDoublePi = 6.28318530717958647692;
@@ -27,6 +27,7 @@ namespace ww_geom {
     struct Deg {
         int deg;
 
+        constexpr Deg(): deg(0) { }
         explicit constexpr Deg(int d) : deg(d) {}
         constexpr operator double() const { return deg * kDegToRad; }
         explicit constexpr operator int() const { return deg; }
@@ -37,6 +38,7 @@ namespace ww_geom {
     struct Rad {
         double rad;
 
+        constexpr Rad(): rad(0) { }
         explicit constexpr Rad(double r) : rad(r) {}
         constexpr operator double() const { return rad; }
 
@@ -127,7 +129,7 @@ namespace ww_geom {
     constexpr Deg FitAngle(Deg angle) {
         int ang = (angle.deg % 360 + 360) % 360;
         if (ang > 180) {
-            ang -= 180;
+            ang -= 360;
         }
         return Deg(ang);
     }
@@ -137,6 +139,6 @@ namespace ww_geom {
         return Rad(ang);
     }
     
-} // namespace ww_geom
+} // namespace ww_vision
 
 #endif

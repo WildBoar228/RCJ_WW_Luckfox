@@ -1,16 +1,25 @@
-#ifndef _RCJ_WW_LUCK_FOX_GEOMETRY_HPP_
-#define _RCJ_WW_LUCK_FOX_GEOMETRY_HPP_
+#ifndef _RCJ_WW_LUCKFOX_GEOMETRY_HPP_
+#define _RCJ_WW_LUCKFOX_GEOMETRY_HPP_
 
 #include "angles.hpp"
 
-namespace ww_geom {
+namespace ww_vision {
 
     struct Point{
         int x = 0;
         int y = 0;
     };
 
+    template <typename CvPoint>
+    ww_vision::Point CastToPoint(const CvPoint& p) {
+        return ww_vision::Point{
+            .x = static_cast<int>(p.x),
+            .y = static_cast<int>(p.y)
+        };
+    }
+
     constexpr int Comp(Point p1, Point p2);
+    constexpr Deg AngleTo(Point from, Point to);
     
     struct LineEquation {
         int a = 0;
@@ -44,13 +53,14 @@ namespace ww_geom {
         static constexpr int vert_cnt = 4;
         Point p[vert_cnt];
         Point center;
+        int area;
     };
 
     constexpr int CalcPointDistanceSq(Point p1, Point p2);
     constexpr int CalcPointDistance(Point p1, Point p2);
     constexpr int CalcSegmentDist(Point p, Segment s);
     constexpr bool SegmentIntersection(Segment s1, Segment s2, Point &p);
-    constexpr int DistToPolygon(Segment ray, const Blob& blob);
+    constexpr int CalcPolygonDist(Segment ray, const Blob& blob);
 
 } // namespace ww_geom
 

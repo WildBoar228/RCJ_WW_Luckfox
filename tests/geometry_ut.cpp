@@ -4,7 +4,7 @@
 #include "geometry.hpp"
 
 namespace {
-    using namespace ww_geom;
+    using namespace ww_vision;
 
     static constexpr double kEps = 1e-9;
 
@@ -292,7 +292,7 @@ namespace {
     }
 
     // -------------------------------------------------------------------
-    // DistToPolygon (ray to blob) — using two‑point segments to avoid angle
+    // CalcPolygonDist (ray to blob) — using two‑point segments to avoid angle
     // -------------------------------------------------------------------
 
     TEST(DistToPolygonTest, RayIntersectsBlobFromLeft) {
@@ -305,7 +305,7 @@ namespace {
 
         // Horizontal ray entering the blob from the left
         Segment ray{Point{-1, 5}, Point{11, 5}};   // from x=-1 to x=11, y=5
-        int dist = DistToPolygon(ray, blob);
+        int dist = CalcPolygonDist(ray, blob);
         // Distance from ray start (-1,5) to first intersection (0,5) is 1
         EXPECT_EQ(dist, 1);
     }
@@ -320,7 +320,7 @@ namespace {
 
         // Ray going straight down far away from blob
         Segment ray{Point{20, 20}, Point{20, 30}};
-        int dist = DistToPolygon(ray, blob);
+        int dist = CalcPolygonDist(ray, blob);
         EXPECT_GT(dist, 0);   // no intersection, distance may be a large sentinel
     }
 

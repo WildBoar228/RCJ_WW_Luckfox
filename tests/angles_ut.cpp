@@ -7,7 +7,7 @@
 
 namespace {
 
-    using namespace ww_geom;
+    using namespace ww_vision;
 
     constexpr double kEps = 1e-9;
 
