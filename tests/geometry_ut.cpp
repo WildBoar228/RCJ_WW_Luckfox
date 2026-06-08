@@ -273,15 +273,15 @@ namespace {
     }
 
     // -------------------------------------------------------------------
-    // Blob
+    // BlobGeom
     // -------------------------------------------------------------------
 
     TEST(BlobTest, VertexCount) {
-        EXPECT_EQ(Blob::vert_cnt, 4);
+        EXPECT_EQ(BlobGeom::vert_cnt, 4);
     }
 
     TEST(BlobTest, CanSetVerticesAndCenter) {
-        Blob blob;
+        BlobGeom blob;
         blob.p[0] = Point{0,0};
         blob.p[1] = Point{10,0};
         blob.p[2] = Point{10,10};
@@ -296,7 +296,7 @@ namespace {
     // -------------------------------------------------------------------
 
     TEST(DistToPolygonTest, RayIntersectsBlobFromLeft) {
-        Blob blob;
+        BlobGeom blob;
         blob.p[0] = Point{0,0};
         blob.p[1] = Point{10,0};
         blob.p[2] = Point{10,10};
@@ -311,7 +311,7 @@ namespace {
     }
 
     TEST(DistToPolygonTest, RayOutsideNoHit) {
-        Blob blob;
+        BlobGeom blob;
         blob.p[0] = Point{0,0};
         blob.p[1] = Point{10,0};
         blob.p[2] = Point{10,10};

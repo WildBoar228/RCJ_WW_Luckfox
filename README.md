@@ -26,8 +26,8 @@
 
 Некоторые библиотеки покрыты тестами с помощью Google Test (геометрия и т.д.). Они доступны в десктопной версии:
 
-`cmake -B build -DBUILD_DESKTOP_DEBUG=ON`
+`cmake -B build -DBUILD_DESKTOP_DEBUG=ON -DBUILD_VISION_TESTS=ON`
 
 `cmake --build build --target rcj_vision_tests --parallel`
 
-На Linux: `build/tests/rcj_vision_tests` (запуск исполняемого файла)
+`build/tests/rcj_vision_tests`

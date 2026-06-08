@@ -120,7 +120,7 @@ namespace ww_vision {
         }
     }
 
-    constexpr int CalcPolygonDist(Segment ray, const Blob& blob) {
+    constexpr int CalcPolygonDist(Segment ray, const BlobGeom& blob) {
         Point intersect;
         int min_dist = 1000;
         for (int i = 0; i < blob.vert_cnt; ++i){

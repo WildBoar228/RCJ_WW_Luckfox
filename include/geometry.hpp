@@ -49,7 +49,7 @@ namespace ww_vision {
 
     constexpr int Comp(const Segment& p1, const Segment& p2);
 
-    struct Blob{
+    struct BlobGeom{
         static constexpr int vert_cnt = 4;
         Point p[vert_cnt];
         Point center;
@@ -60,7 +60,7 @@ namespace ww_vision {
     constexpr int CalcPointDistance(Point p1, Point p2);
     constexpr int CalcSegmentDist(Point p, Segment s);
     constexpr bool SegmentIntersection(Segment s1, Segment s2, Point &p);
-    constexpr int CalcPolygonDist(Segment ray, const Blob& blob);
+    constexpr int CalcPolygonDist(Segment ray, const BlobGeom& blob);
 
 } // namespace ww_geom
 

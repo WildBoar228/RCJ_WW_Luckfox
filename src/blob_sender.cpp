@@ -6,13 +6,13 @@
 
 namespace ww_vision {
 
-    void SendBlobs(std::ostream& out, const std::vector<ww_vision::Blob>& blobs) {
+    void SendBlobs(std::ostream& out, const std::vector<ww_vision::BlobGeom>& blobs) {
         out << blobs.size() << " blobs\n";
-        for (const ww_vision::Blob& b : blobs) {
+        for (const ww_vision::BlobGeom& b : blobs) {
             BlobInfo bi = CalcBlobInfo(b);
 
-            // #ifdef DESKTOP_DEBUG
-            out << "\n Blob:\n";
+            #ifdef DESKTOP_DEBUG
+            out << "\n BlobGeom:\n";
             out << " > left_angle: " << bi.left_angle << '\n';
             out << " > right_angle: " << bi.right_angle << '\n';
             out << " > center_angle: " << bi.center_angle << '\n';
@@ -22,7 +22,7 @@ namespace ww_vision {
             out << " > center_distance: " << bi.center_distance << '\n';
             out << " > height: " << bi.height << '\n';
             out << std::endl;
-            // #endif
+            #endif
         }
     }
 

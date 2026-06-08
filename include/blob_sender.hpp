@@ -8,7 +8,7 @@
 
 namespace ww_vision {
 
-    void SendBlobs(std::ostream&, const std::vector<ww_vision::Blob>&);
+    void SendBlobs(std::ostream&, const std::vector<ww_vision::BlobGeom>&);
 
 } // namespace ww_vision
 

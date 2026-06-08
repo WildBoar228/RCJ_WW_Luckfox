@@ -28,22 +28,22 @@ namespace ww_vision {
 
     auto FindBlobs(
         const cv::Mat& lab,
-        std::vector<ColorThreshold>& thresholds
-    ) -> std::vector<std::vector<Blob>> {
+        const std::vector<ColorThreshold>& thresholds
+    ) -> std::vector<std::vector<BlobGeom>> {
 
-        std::vector<std::vector<Blob>> blobs;
+        std::vector<std::vector<BlobGeom>> blobs;
         cv::Mat mask;
 
-        for (ColorThreshold& thr : thresholds) {
+        for (const ColorThreshold& thr : thresholds) {
             cv::inRange(lab, thr.lower, thr.upper, mask);
-            std::vector<Blob> rects = FindBoundingRects(mask);
+            std::vector<BlobGeom> rects = FindBoundingRects(mask);
             blobs.push_back(std::move(rects));
         }
 
         return blobs;
     }
 
-    auto FindBoundingRects(const cv::Mat& mask) -> std::vector<Blob> {
+    auto FindBoundingRects(const cv::Mat& mask) -> std::vector<BlobGeom> {
         std::vector<std::vector<cv::Point>> contours;
         std::vector<cv::Vec4i> hierarchy;
 
@@ -55,17 +55,17 @@ namespace ww_vision {
             cv::CHAIN_APPROX_SIMPLE
         );
 
-        std::vector<Blob> blobs;
+        std::vector<BlobGeom> blobs;
 
         for (const auto& contour : contours) {
             if (cv::contourArea(contour) < 100) {
                 continue;
             }
             cv::RotatedRect rect = cv::minAreaRect(contour);
-            cv::Point2f corners[Blob::vert_cnt];
+            cv::Point2f corners[BlobGeom::vert_cnt];
             rect.points(corners);
-            Blob blob;
-            for (int i = 0; i < Blob::vert_cnt; ++i) {
+            BlobGeom blob;
+            for (int i = 0; i < BlobGeom::vert_cnt; ++i) {
                 blob.p[i] = PointFromImage(corners[i]);
             }
             blob.center = PointFromImage(rect.center);
@@ -76,7 +76,7 @@ namespace ww_vision {
         return blobs;
     }
 
-    BlobInfo CalcBlobInfo(const Blob& blob) {
+    BlobInfo CalcBlobInfo(const BlobGeom& blob) {
         BlobInfo bi;
         CalcAngleRange(blob, bi);
         CalcBlobDistance(blob, bi, vision_cfg.dist_to_center);
@@ -84,17 +84,16 @@ namespace ww_vision {
         return bi;
     }
 
-    void CalcAngleRange(const Blob& blob, BlobInfo& bi) {
+    void CalcAngleRange(const BlobGeom& blob, BlobInfo& bi) {
         Deg angles[blob.vert_cnt];
         for (int i = 0; i < blob.vert_cnt; ++i) {
             angles[i] = Rad(
                 std::atan2(blob.p[i].x - vision_cfg.center.x,
                            blob.p[i].y - vision_cfg.center.y)
             );
-            std::cout << i << ":  corner angle " << angles[i] << "\n";
         }
 
-        for (int i = 0; i < Blob::vert_cnt; ++i) {
+        for (int i = 0; i < BlobGeom::vert_cnt; ++i) {
             if (i == 0) {
                 bi.center_angle = angles[i];
                 bi.left_angle = angles[i];
@@ -111,7 +110,6 @@ namespace ww_vision {
                         bi.right_angle = angles[i];
                     }
                 }
-                std::cout << angles[i] << ":   " << bi.left_angle << " < " << bi.center_angle << " < " << bi.right_angle << "\n";
             }
         }
         bi.center_angle = Rad(std::atan2(
@@ -124,7 +122,7 @@ namespace ww_vision {
         }
     }
 
-    void CalcBlobDistance(const Blob& blob, BlobInfo& bi, bool to_center) {
+    void CalcBlobDistance(const BlobGeom& blob, BlobInfo& bi, bool to_center) {
         if (to_center) {
             bi.distance = CalcPolygonDist(
                 Segment(
@@ -148,10 +146,10 @@ namespace ww_vision {
         }
         
         bi.clos_angle = bi.center_angle;
-        bi.center_distance = ww_vision::CalcPointDistance(vision_cfg.center, blob.center);
+        bi.center_distance = CalcPointDistance(vision_cfg.center, blob.center);
     }
 
-    void CalcBlobHeight(const Blob& blob, BlobInfo& bi) {
+    void CalcBlobHeight(const BlobGeom& blob, BlobInfo& bi) {
         bi.height = 0;
         for (int i = 0; i < blob.vert_cnt; ++i) {
             int temp = CalcPointDistance(vision_cfg.center, blob.p[i]);
@@ -218,5 +216,95 @@ namespace ww_vision {
 
         return polygons;
     }
+
+    #ifdef DESKTOP_DEBUG
+    FrameFetcher::FrameFetcher(): cap(0) { }
+
+    auto FrameFetcher::ReadBlobs(const std::vector<ColorThreshold>& thresholds)
+        -> std::vector<std::vector<BlobGeom>> {
+        
+        cap >> frame;
+        if (frame.empty()) {
+            std::cerr << "Empty frame\n";
+            return {};
+        }
+
+        result = frame.clone();
+
+        cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);
+        if (thresholds.size() >= 1) {
+            cv::inRange(lab, thresholds[0].lower, thresholds[0].upper, mask);
+        }
+
+        auto blobs = FindBlobs(
+            lab, thresholds,
+            [](const BlobGeom& a, const BlobGeom& b) {
+                return a.area > b.area;
+            }, max_color_blobs_
+        );
+
+        for (const auto& color_blobs : blobs) {
+            for (const BlobGeom& blob : color_blobs) {
+                DrawBlob(result, blob);
+            }
+        }
+
+        cv::imshow("Camera", frame);
+        cv::imshow("Mask", mask);
+        cv::imshow("Detected", result);
+
+        return blobs;
+    }
+    
+    void FrameFetcher::DrawBlob(cv::Mat& result, const BlobGeom& blob) {
+        std::vector<cv::Point> polygon(blob.vert_cnt);
+        for (int i = 0; i < blob.vert_cnt; ++i) {
+            polygon[i] = PointToImage(blob.p[i]);
+        }
+        cv::polylines(result, polygon, true, cv::Scalar(0, 255, 0), 2);
+
+        BlobInfo bi = CalcBlobInfo(blob);
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.center_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(100, 100, 100), 3
+        );
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.left_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(0, 0, 255), 2
+        );
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.right_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(0, 0, 255), 1
+        );
+    }
+
+    #else
+
+    FrameFetcher::FrameFetcher() { }
+
+    auto FrameFetcher::ReadBlobs(const std::vector<ColorThreshold>& thr)
+        -> std::vector<std::vector<BlobGeom>> {
+        return {};
+    }
+
+    #endif
 
 } // namespace ww_vision
