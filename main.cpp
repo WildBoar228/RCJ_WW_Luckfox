@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <utility>
 #include <vector>
 
@@ -13,6 +14,8 @@
 int main() {
     #ifdef DESKTOP_DEBUG
     std::cout << "BUILD_DESKTOP_DEBUG\n";
+    #else
+    std::ofstream uart("/dev/ttyS3", std::ios::out | std::ios::binary);
     #endif
     ww_vision::FrameFetcher ff;
     
@@ -25,15 +28,11 @@ int main() {
 
     while (true) {
         auto blobs = ff.ReadBlobs(thresholds);
-        for (const auto& color_blobs : blobs) {
-            ww_vision::SendBlobs(std::cout, color_blobs);
-        }
-        std::getchar();
-
-        int key = cv::waitKey(1);
-        if (key == 27 || key == 'q') {
-            break;
-        }
+        #ifdef DESKTOP_DEBUG
+        ww_vision::SendBlobs(std::cout, blobs);
+        #else
+        ww_vision::SendBlobs(uart, blobs);
+        #endif
     }
 
     return 0;

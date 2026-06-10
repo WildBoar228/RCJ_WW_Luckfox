@@ -2,6 +2,7 @@
 #define _RCJ_WW_LUCKFOX_INCLUDE_ANGLES_HPP_
 
 #include <cmath>
+#include <cstdint>
 #include <iostream>
 
 namespace ww_vision {
@@ -25,12 +26,12 @@ namespace ww_vision {
     struct Rad;
 
     struct Deg {
-        int deg;
+        int16_t deg;
 
         constexpr Deg(): deg(0) { }
-        explicit constexpr Deg(int d) : deg(d) {}
+        explicit constexpr Deg(int16_t d) : deg(d) {}
         constexpr operator double() const { return deg * kDegToRad; }
-        explicit constexpr operator int() const { return deg; }
+        explicit constexpr operator int16_t() const { return deg; }
 
         constexpr operator Rad() const;
     };
@@ -43,7 +44,7 @@ namespace ww_vision {
         constexpr operator double() const { return rad; }
 
         constexpr operator Deg() const {
-            return Deg(static_cast<int>(rad * kRadToDeg + (rad > 0 ? 0.5 : -0.5)));
+            return Deg(static_cast<int16_t>(rad * kRadToDeg + (rad > 0 ? 0.5 : -0.5)));
         }
     };
 
@@ -58,13 +59,13 @@ namespace ww_vision {
     constexpr Deg operator-(Deg lhs, Deg rhs) {
         return Deg(lhs.deg - rhs.deg);
     }
-    constexpr Deg operator*(Deg lhs, int scale) {
+    constexpr Deg operator*(Deg lhs, int16_t scale) {
         return Deg(lhs.deg * scale);
     }
-    constexpr Deg operator*(int scale, Deg rhs) {
+    constexpr Deg operator*(int16_t scale, Deg rhs) {
         return Deg(scale * rhs.deg);
     }
-    constexpr Deg operator/(Deg lhs, int div) {
+    constexpr Deg operator/(Deg lhs, int16_t div) {
         return Deg(lhs.deg / div);
     }
     constexpr Deg operator-(Deg d) {
@@ -83,7 +84,7 @@ namespace ww_vision {
     }
 
     constexpr Deg operator""_deg(unsigned long long num) {
-        return Deg(static_cast<int>(num));
+        return Deg(static_cast<int16_t>(num));
     }
 
 
@@ -127,7 +128,7 @@ namespace ww_vision {
 
 
     constexpr Deg FitAngle(Deg angle) {
-        int ang = (angle.deg % 360 + 360) % 360;
+        int16_t ang = (angle.deg % 360 + 360) % 360;
         if (ang > 180) {
             ang -= 360;
         }

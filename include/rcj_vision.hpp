@@ -8,6 +8,30 @@
 
 #ifdef DESKTOP_DEBUG
 #include <opencv2/videoio.hpp>
+#else 
+
+#include "rk_debug.h"
+#include "rk_defines.h"
+#include "rk_mpi_adec.h"
+#include "rk_mpi_aenc.h"
+#include "rk_mpi_ai.h"
+#include "rk_mpi_ao.h"
+#include "rk_mpi_avs.h"
+#include "rk_mpi_cal.h"
+#include "rk_mpi_ivs.h"
+#include "rk_mpi_mb.h"
+#include "rk_mpi_rgn.h"
+#include "rk_mpi_sys.h"
+#include "rk_mpi_tde.h"
+#include "rk_mpi_vdec.h"
+#include "rk_mpi_venc.h"
+#include "rk_mpi_vi.h"
+#include "rk_mpi_vo.h"
+#include "rk_mpi_vpss.h"
+
+#include "rtsp_demo.h"
+#include "sample_comm.h"
+
 #endif
 
 #include "geometry.hpp"
@@ -79,11 +103,38 @@ namespace ww_vision {
         #ifdef DESKTOP_DEBUG
         cv::VideoCapture cap;
         cv::Mat result;
-        cv::Mat mask;
+        #else
+
+        int width = 1920;
+        int height = 1080;
+
+        char fps_text[16];
+        float fps = 0;
+
+        RK_S32 s32Ret = 0;
+
+        VENC_STREAM_S stFrame;
+        RK_U64 H264_PTS = 0;
+        RK_U32 H264_TimeRef = 0; 
+        VIDEO_FRAME_INFO_S stViFrame;
+
+        MB_POOL_CONFIG_S PoolCfg;
+        MB_POOL src_Pool;
+
+        MB_BLK src_Blk;
+
+        unsigned char* data;
+
+        VIDEO_FRAME_INFO_S h264_frame;
+
+        rtsp_demo_handle g_rtsplive = NULL;
+        rtsp_session_handle g_rtsp_session;
+
         #endif
 
         cv::Mat frame;
         cv::Mat lab;
+        cv::Mat mask;
 
         static constexpr int max_color_blobs_ = 2;
 
@@ -107,6 +158,8 @@ namespace ww_vision {
         }
         void DrawBlob(cv::Mat&, const BlobGeom&);
         #endif
+
+        ~FrameFetcher();
     };
 
 } // namespace ww_vision
