@@ -264,52 +264,15 @@ namespace ww_vision {
         return blobs;
     }
     
-    void FrameFetcher::DrawBlob(cv::Mat& result, const BlobGeom& blob) {
-        std::vector<cv::Point> polygon(blob.vert_cnt);
-        for (int i = 0; i < blob.vert_cnt; ++i) {
-            polygon[i] = PointToImage(blob.p[i]);
-        }
-        cv::polylines(result, polygon, true, cv::Scalar(0, 255, 0), 2);
-
-        BlobInfo bi = CalcBlobInfo(blob);
-
-        DrawRay(
-            result,
-            Segment(
-                vision_cfg.center,
-                bi.center_angle,
-                bi.center_distance
-            ),
-            cv::Scalar(100, 100, 100), 3
-        );
-
-        DrawRay(
-            result,
-            Segment(
-                vision_cfg.center,
-                bi.left_angle,
-                bi.center_distance
-            ),
-            cv::Scalar(0, 0, 255), 2
-        );
-
-        DrawRay(
-            result,
-            Segment(
-                vision_cfg.center,
-                bi.right_angle,
-                bi.center_distance
-            ),
-            cv::Scalar(0, 0, 255), 1
-        );
-    }
-    
     FrameFetcher::~FrameFetcher() { }
 
-#else
+    #else
 
     FrameFetcher::FrameFetcher() {
         system("RkLunch-stop.sh");
+
+        width = vision_cfg.frame_width;
+        height = vision_cfg.frame_height;
 
         memset(fps_text,0,16);
 
@@ -372,6 +335,8 @@ namespace ww_vision {
 
     auto FrameFetcher::ReadBlobs(const std::vector<ColorThreshold>& thresholds)
         -> std::vector<std::vector<BlobGeom>> {
+
+        static std::vector<std::vector<BlobGeom>> blobs;
         
         // get vi frame
 		h264_frame.stVFrame.u32TimeRef = H264_TimeRef++;
@@ -385,6 +350,24 @@ namespace ww_vision {
 			cv::Mat bgr(height, width, CV_8UC3, data);			
 			cv::cvtColor(yuv420sp, bgr, cv::COLOR_YUV420sp2BGR);
 			cv::resize(bgr, frame, cv::Size(width ,height), 0, 0, cv::INTER_LINEAR);
+
+            cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);
+            if (thresholds.size() >= 1) {
+                cv::inRange(lab, thresholds[0].lower, thresholds[0].upper, mask);
+            }
+
+            blobs = FindBlobs(
+                lab, thresholds,
+                [](const BlobGeom& a, const BlobGeom& b) {
+                    return a.area > b.area;
+                }, max_color_blobs_
+            );
+
+            for (const auto& color_blobs : blobs) {
+                for (const BlobGeom& blob : color_blobs) {
+                    DrawBlob(frame, blob);
+                }
+            }
 			
 			sprintf(fps_text,"fps = %.2f",fps);		
             cv::putText(frame,fps_text,
@@ -422,18 +405,6 @@ namespace ww_vision {
 			RK_LOGE("RK_MPI_VENC_ReleaseStream fail %x", s32Ret);
 		}
 
-        cv::cvtColor(frame, lab, cv::COLOR_BGR2Lab);
-        if (thresholds.size() >= 1) {
-            cv::inRange(lab, thresholds[0].lower, thresholds[0].upper, mask);
-        }
-
-        auto blobs = FindBlobs(
-            lab, thresholds,
-            [](const BlobGeom& a, const BlobGeom& b) {
-                return a.area > b.area;
-            }, max_color_blobs_
-        );
-
         return blobs;
     }
 
@@ -460,5 +431,45 @@ namespace ww_vision {
     }
 
     #endif
+    
+    void FrameFetcher::DrawBlob(cv::Mat& result, const BlobGeom& blob) {
+        std::vector<cv::Point> polygon(blob.vert_cnt);
+        for (int i = 0; i < blob.vert_cnt; ++i) {
+            polygon[i] = PointToImage(blob.p[i]);
+        }
+        cv::polylines(result, polygon, true, cv::Scalar(0, 255, 0), 2);
+
+        BlobInfo bi = CalcBlobInfo(blob);
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.center_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(100, 100, 100), 3
+        );
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.left_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(0, 0, 255), 2
+        );
+
+        DrawRay(
+            result,
+            Segment(
+                vision_cfg.center,
+                bi.right_angle,
+                bi.center_distance
+            ),
+            cv::Scalar(0, 0, 255), 1
+        );
+    }
 
 } // namespace ww_vision

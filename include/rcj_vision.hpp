@@ -2,6 +2,7 @@
 #define _RCJ_WW_LUCKFOX_RCJ_VISION_HPP_
 
 #include <cstdint>
+
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -101,12 +102,14 @@ namespace ww_vision {
 
     class FrameFetcher {
         #ifdef DESKTOP_DEBUG
+
         cv::VideoCapture cap;
         cv::Mat result;
+
         #else
 
-        int width = 1920;
-        int height = 1080;
+        int width = 0;
+        int height = 0;
 
         char fps_text[16];
         float fps = 0;
@@ -144,11 +147,8 @@ namespace ww_vision {
         auto ReadBlobs(const std::vector<ColorThreshold>&)
             -> std::vector<std::vector<BlobGeom>>;
 
-        #ifdef DESKTOP_DEBUG
         void DrawRay(cv::Mat& result, const Segment& segm,
                      cv::Scalar color = cv::Scalar(0, 0, 255), int width = 1) {
-            std::cout << PointToImage(segm.Begin()) << "\n";
-            std::cout << PointToImage(segm.End()) << "\n";
             cv::line(
                 result,
                 PointToImage(segm.Begin()),
@@ -157,7 +157,6 @@ namespace ww_vision {
             );
         }
         void DrawBlob(cv::Mat&, const BlobGeom&);
-        #endif
 
         ~FrameFetcher();
     };

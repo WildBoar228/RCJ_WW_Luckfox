@@ -12,16 +12,18 @@ namespace ww_vision {
     static constexpr double kRadToDeg = 180. / kPi;
     static constexpr double kDegToRad = kPi / 180.;
 
-    // Для Миши:
+    /*
+    Для Миши:
 
-    // Angles increase clockwise, zero is the Y axis ("up")
-    //        0
-    //   -45  ^  45
-    //      \ | /
-    // -90 <-   -> 90
-    //      / | \ 
-    //  -135  v  135
-    //      +-180
+    Angles increase clockwise, zero is the Y axis ("up")
+           0
+      -45  ^  45
+         \ | /
+    -90 <-   -> 90
+         / | \ 
+     -135  v  135
+         +-180
+    */
 
     struct Rad;
 
