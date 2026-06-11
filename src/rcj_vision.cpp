@@ -244,9 +244,17 @@ namespace ww_vision {
             }, max_color_blobs_
         );
 
-        for (const auto& color_blobs : blobs) {
-            for (const BlobGeom& blob : color_blobs) {
-                DrawBlob(result, blob);
+        if (vision_cfg.send_stream) {
+            int color_idx = 0;
+            for (const auto& color_blobs : blobs) {
+                for (const BlobGeom& blob : color_blobs) {
+                    if (color_idx > vision_cfg.default_thr_colors.size()) {
+                        DrawBlob(result, blob, cv::Scalar(0, 255, 0));
+                    } else {
+                        DrawBlob(result, blob, vision_cfg.default_thr_colors[color_idx]);
+                    }
+                }
+                ++color_idx;
             }
         }
 
@@ -317,10 +325,12 @@ namespace ww_vision {
         }
 
         // rtsp init	
-        g_rtsplive = create_rtsp_demo(554);
-        g_rtsp_session = rtsp_new_session(g_rtsplive, "/live/0");
-        rtsp_set_video(g_rtsp_session, RTSP_CODEC_ID_VIDEO_H264, NULL, 0);
-        rtsp_sync_video_ts(g_rtsp_session, rtsp_get_reltime(), rtsp_get_ntptime());
+        if (vision_cfg.send_stream) {
+            g_rtsplive = create_rtsp_demo(554);
+            g_rtsp_session = rtsp_new_session(g_rtsplive, "/live/0");
+            rtsp_set_video(g_rtsp_session, RTSP_CODEC_ID_VIDEO_H264, NULL, 0);
+            rtsp_sync_video_ts(g_rtsp_session, rtsp_get_reltime(), rtsp_get_ntptime());
+        }
 
         // vi init
         vi_dev_init();
@@ -363,9 +373,17 @@ namespace ww_vision {
                 }, max_color_blobs_
             );
 
-            for (const auto& color_blobs : blobs) {
-                for (const BlobGeom& blob : color_blobs) {
-                    DrawBlob(frame, blob);
+            if (vision_cfg.send_stream) {
+                size_t color_idx = 0;
+                for (const auto& color_blobs : blobs) {
+                    for (const BlobGeom& blob : color_blobs) {
+                        if (color_idx > vision_cfg.default_thr_colors.size()) {
+                            DrawBlob(frame, blob, cv::Scalar(0, 255, 0));
+                        } else {
+                            DrawBlob(frame, blob, vision_cfg.default_thr_colors[color_idx]);
+                        }
+                    }
+                    ++color_idx;
                 }
             }
 			
@@ -378,32 +396,34 @@ namespace ww_vision {
 		}
 		memcpy(data, frame.data, width * height * 3);
 		
-		// encode H264	
-		RK_MPI_VENC_SendFrame(0,  &h264_frame ,-1);
-	
-		// rtsp
-		s32Ret = RK_MPI_VENC_GetStream(0, &stFrame, -1);	
-		if(s32Ret == RK_SUCCESS) {
-			if(g_rtsplive && g_rtsp_session) {
-				//printf("len = %d PTS = %d \n",stFrame.pstPack->u32Len, stFrame.pstPack->u64PTS);	
-				void *pData = RK_MPI_MB_Handle2VirAddr(stFrame.pstPack->pMbBlk);
-				rtsp_tx_video(g_rtsp_session, (uint8_t *)pData, stFrame.pstPack->u32Len,
-							  stFrame.pstPack->u64PTS);
-				rtsp_do_event(g_rtsplive);
-			}
-			RK_U64 nowUs = TEST_COMM_GetNowUs();
-			fps = (float) 1000000 / (float)(nowUs - h264_frame.stVFrame.u64PTS);			
-		}
+        if (vision_cfg.send_stream) {
+            // encode H264	
+            RK_MPI_VENC_SendFrame(0,  &h264_frame ,-1);
+        
+            // rtsp
+            s32Ret = RK_MPI_VENC_GetStream(0, &stFrame, -1);	
+            if(s32Ret == RK_SUCCESS) {
+                if(g_rtsplive && g_rtsp_session) {
+                    //printf("len = %d PTS = %d \n",stFrame.pstPack->u32Len, stFrame.pstPack->u64PTS);	
+                    void *pData = RK_MPI_MB_Handle2VirAddr(stFrame.pstPack->pMbBlk);
+                    rtsp_tx_video(g_rtsp_session, (uint8_t *)pData, stFrame.pstPack->u32Len,
+                                stFrame.pstPack->u64PTS);
+                    rtsp_do_event(g_rtsplive);
+                }
+                RK_U64 nowUs = TEST_COMM_GetNowUs();
+                fps = (float) 1000000 / (float)(nowUs - h264_frame.stVFrame.u64PTS);			
+            }
 
-		// release frame 
-		s32Ret = RK_MPI_VI_ReleaseChnFrame(0, 0, &stViFrame);
-		if (s32Ret != RK_SUCCESS) {
-			RK_LOGE("RK_MPI_VI_ReleaseChnFrame fail %x", s32Ret);
-		}
-		s32Ret = RK_MPI_VENC_ReleaseStream(0, &stFrame);
-		if (s32Ret != RK_SUCCESS) {
-			RK_LOGE("RK_MPI_VENC_ReleaseStream fail %x", s32Ret);
-		}
+            // release frame 
+            s32Ret = RK_MPI_VI_ReleaseChnFrame(0, 0, &stViFrame);
+            if (s32Ret != RK_SUCCESS) {
+                RK_LOGE("RK_MPI_VI_ReleaseChnFrame fail %x", s32Ret);
+            }
+            s32Ret = RK_MPI_VENC_ReleaseStream(0, &stFrame);
+            if (s32Ret != RK_SUCCESS) {
+                RK_LOGE("RK_MPI_VENC_ReleaseStream fail %x", s32Ret);
+            }
+        }
 
         return blobs;
     }
@@ -424,20 +444,22 @@ namespace ww_vision {
 
         free(stFrame.pstPack);
 
-        if (g_rtsplive)
-            rtsp_del_demo(g_rtsplive);
+        if (vision_cfg.send_stream) {
+            if (g_rtsplive)
+                rtsp_del_demo(g_rtsplive);
+        }
         
         RK_MPI_SYS_Exit();
     }
 
     #endif
     
-    void FrameFetcher::DrawBlob(cv::Mat& result, const BlobGeom& blob) {
+    void FrameFetcher::DrawBlob(cv::Mat& result, const BlobGeom& blob, cv::Scalar color) {
         std::vector<cv::Point> polygon(blob.vert_cnt);
         for (int i = 0; i < blob.vert_cnt; ++i) {
             polygon[i] = PointToImage(blob.p[i]);
         }
-        cv::polylines(result, polygon, true, cv::Scalar(0, 255, 0), 2);
+        cv::polylines(result, polygon, true, color, 2);
 
         BlobInfo bi = CalcBlobInfo(blob);
 
@@ -458,7 +480,7 @@ namespace ww_vision {
                 bi.left_angle,
                 bi.center_distance
             ),
-            cv::Scalar(0, 0, 255), 2
+            color, 2
         );
 
         DrawRay(
@@ -468,7 +490,7 @@ namespace ww_vision {
                 bi.right_angle,
                 bi.center_distance
             ),
-            cv::Scalar(0, 0, 255), 1
+            color, 1
         );
     }
 

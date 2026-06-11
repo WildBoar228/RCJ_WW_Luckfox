@@ -1,11 +1,14 @@
 #include <iostream>
 #include <chrono>
+#include <cstring>
 #include <fstream>
 #include <utility>
 #include <vector>
 
 #ifdef DESKTOP_DEBUG
 #include <opencv2/videoio.hpp>
+#else
+#include <termios.h>
 #endif
 
 #include "rcj_vision.hpp"
@@ -101,7 +104,7 @@ void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>
         // A from -128..127 to 0..255
         color[2] = color[2] + 128;
         color[3] = color[3] + 128;
-        // A from -128..127 to 0..255
+        // B from -128..127 to 0..255
         color[4] = color[4] + 128;
         color[5] = color[5] + 128;
 
@@ -116,12 +119,53 @@ void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>
 }
 
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 2 && strcmp(argv[1], "--stream") == 0) {
+        ww_vision::vision_cfg.send_stream = true;
+        std::cout << "--stream detected\n";
+    }
+
     #ifdef DESKTOP_DEBUG
     std::cout << "BUILD_DESKTOP_DEBUG\n";
     const char* thresholds_path = "thresholds.txt";
     #else
-    std::ofstream uart("/dev/ttyS3", std::ios::out | std::ios::binary);
+
+    const char* serial_port = "/dev/ttyS3";
+
+    int serial_fd;
+    serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
+    if (serial_fd == -1) {
+        perror("Failed to open serial port");
+        return 1;
+    }
+    
+    struct termios tty;
+    memset(&tty, 0, sizeof(tty));
+
+    if (tcgetattr(serial_fd, &tty) != 0) {
+        perror("Error from tcgetattr");
+        return 1;
+    }
+
+    cfsetospeed(&tty, B115200);
+    cfsetispeed(&tty, B115200);
+
+    tty.c_cflag &= ~PARENB;
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;
+
+    if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
+        perror("Error from tcsetattr");
+        return 1;
+    }
+    close(serial_fd);
+
+    std::ofstream uart(serial_port, std::ios::out | std::ios::binary);
+    if (uart.fail()) {
+        std::cerr << "ERROR: can't write to ttyS3" << std::endl;
+    }
+
     const char* thresholds_path = "/userdata/thresholds.txt";
     #endif
 

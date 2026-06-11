@@ -7,18 +7,21 @@
 
 namespace ww_vision {
 
-    void SerializeInt(char* data, int16_t val) {
-        data[0] = (static_cast<uint16_t>(val) >> 8) & 0xFF;
-        data[1] = val & 0xFF;
+    void SerializeInt(char* data, int val) {
+        data[0] = (abs(val) >> 8) & 0xFF;
+        data[1] = abs(val) & 0xFF;
+        if (val < 0) {
+            data[0] |= 0x80;
+        }
     }
 
     void SerializeBlob(char* data, const BlobInfo& bi) {
-        SerializeInt(&data[0], bi.left_angle);
-        SerializeInt(&data[2], bi.center_angle);
-        SerializeInt(&data[4], bi.right_angle);
-        SerializeInt(&data[6], bi.clos_angle);
+        SerializeInt(&data[0], bi.left_angle.deg);
+        SerializeInt(&data[2], bi.center_angle.deg);
+        SerializeInt(&data[4], bi.right_angle.deg);
+        SerializeInt(&data[6], bi.clos_angle.deg);
         SerializeInt(&data[8], bi.distance);
-        SerializeInt(&data[10], bi.width);
+        SerializeInt(&data[10], bi.width.deg);
         SerializeInt(&data[12], bi.height);
     }
 
@@ -26,27 +29,6 @@ namespace ww_vision {
         std::ostream& out,
         const std::vector<std::vector<BlobGeom>>& blobs
     ) {
-        #ifdef DESKTOP_DEBUG
-
-        for (const auto& color_blobs : blobs) {
-            out << blobs.size() << " blobs\n";
-            for (const ww_vision::BlobGeom& b : color_blobs) {
-                BlobInfo bi = CalcBlobInfo(b);
-                out << "\n BlobGeom:\n";
-                out << " > left_angle: " << bi.left_angle << '\n';
-                out << " > right_angle: " << bi.right_angle << '\n';
-                out << " > center_angle: " << bi.center_angle << '\n';
-                out << " > width: " << bi.width << '\n';
-                out << " > clos_angle: " << bi.clos_angle << '\n';
-                out << " > distance: " << bi.distance << '\n';
-                out << " > center_distance: " << bi.center_distance << '\n';
-                out << " > height: " << bi.height << '\n';
-                out << std::endl;
-            }
-        }
-
-        #else
-
         static constexpr int kBlobInfoLen = sizeof(int16_t) * 7;
         static constexpr int kPackageLen = 2 + 2 * kBlobInfoLen;
         static char data[kPackageLen];
@@ -62,7 +44,35 @@ namespace ww_vision {
             write_index += kBlobInfoLen;
         }
 
+        std::cout << "write data: ";
+        for (int i = 0; i < kPackageLen; ++i) {
+            std::cout << std::hex << static_cast<int>(data[i]) << " ";
+        }
+        std::cout << std::dec << std::endl;
+
+        for (const auto& color_blobs : blobs) {
+            std::cout << blobs.size() << " blobs\n";
+            for (const ww_vision::BlobGeom& b : color_blobs) {
+                BlobInfo bi = CalcBlobInfo(b);
+                std::cout << "\n BlobGeom:\n";
+                std::cout << " > left_angle: " << bi.left_angle << '\n';
+                std::cout << " > right_angle: " << bi.right_angle << '\n';
+                std::cout << " > center_angle: " << bi.center_angle << '\n';
+                std::cout << " > width: " << bi.width << '\n';
+                std::cout << " > clos_angle: " << bi.clos_angle << '\n';
+                std::cout << " > distance: " << bi.distance << '\n';
+                std::cout << " > center_distance: " << bi.center_distance << '\n';
+                std::cout << " > height: " << bi.height << '\n';
+                std::cout << std::endl;
+            }
+        }
+
+        #ifdef DESKTOP_DEBUG
+
+        #else
+
         out.write(data, sizeof(data));
+        out.flush();
 
         #endif
     }
