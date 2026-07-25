@@ -2,3 +2,5 @@
 /.vscode
 /.github
 .env
+
+thresholds.txt
