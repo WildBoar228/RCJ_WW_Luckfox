@@ -135,31 +135,31 @@ int main(int argc, char** argv) {
     int serial_fd;
     serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
     if (serial_fd == -1) {
-        perror("Failed to open serial port");
-        return 1;
+        perror("Failed to open serial port, NO UART!!!");
+    } else {
+        
+        struct termios tty;
+        memset(&tty, 0, sizeof(tty));
+
+        if (tcgetattr(serial_fd, &tty) != 0) {
+            perror("Error from tcgetattr");
+            return 1;
+        }
+
+        cfsetospeed(&tty, B115200);
+        cfsetispeed(&tty, B115200);
+
+        tty.c_cflag &= ~PARENB;
+        tty.c_cflag &= ~CSTOPB;
+        tty.c_cflag &= ~CSIZE;
+        tty.c_cflag |= CS8;
+
+        if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
+            perror("Error from tcsetattr");
+            return 1;
+        }
+        close(serial_fd);
     }
-    
-    struct termios tty;
-    memset(&tty, 0, sizeof(tty));
-
-    if (tcgetattr(serial_fd, &tty) != 0) {
-        perror("Error from tcgetattr");
-        return 1;
-    }
-
-    cfsetospeed(&tty, B115200);
-    cfsetispeed(&tty, B115200);
-
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
-
-    if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
-        perror("Error from tcsetattr");
-        return 1;
-    }
-    close(serial_fd);
 
     std::ofstream uart(serial_port, std::ios::out | std::ios::binary);
     if (uart.fail()) {

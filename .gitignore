@@ -3,4 +3,4 @@
 /.github
 .env
 
-thresholds.txt
+*.txt

@@ -4,7 +4,11 @@ DELAY=2
 
 start() {
     export LD_LIBRARY_PATH=/oem/usr/lib:$LD_LIBRARY_PATH
-    (sleep $DELAY && echo "Start rcj_ww_luckfox" >> /var/log/rcj_init.log && /root/rcj_ww_luckfox >> /var/log/rcj_ww_luckfox.log 2>&1) &
+    (
+        sleep $DELAY &&
+        echo "Start rcj_ww_luckfox" >> /var/log/rcj_init.log &&
+        /root/rcj_ww_luckfox >> /var/log/rcj_ww_luckfox.log 2>&1
+    ) &
 }
 
 case $1 in
