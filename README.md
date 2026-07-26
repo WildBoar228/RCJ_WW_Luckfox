@@ -6,9 +6,9 @@
 
 В директории проекта:
 
-`cmake -B build -DBUILD_DESKTOP_DEBUG=ON`
+`cmake -B build-debug -DBUILD_DESKTOP_DEBUG=ON`
 
-`cmake --build build --target rcj_ww_vision`
+`cmake --build build-debug --target rcj_ww_vision`
 
 После этого исполняемый файл находится в `build/rcj_ww_vision`.
 

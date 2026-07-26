@@ -118,6 +118,40 @@ void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>
     result = thresholds;
 }
 
+#ifndef DESKTOP_DEBUG
+int SetupUart(const char* serial_port) {
+    int serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
+    if (serial_fd == -1) {
+        perror("Failed to open serial port, NO UART!!!");
+        return 1;
+    }
+
+    struct termios tty;
+    memset(&tty, 0, sizeof(tty));
+
+    if (tcgetattr(serial_fd, &tty) != 0) {
+        perror("Error from tcgetattr");
+        return 1;
+    }
+
+    cfsetospeed(&tty, B115200);
+    cfsetispeed(&tty, B115200);
+
+    tty.c_cflag &= ~PARENB;
+    tty.c_cflag &= ~CSTOPB;
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8;
+
+    if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
+        perror("Error from tcsetattr");
+        return 1;
+    }
+    close(serial_fd);
+
+    return 0;
+}
+#endif
+
 
 int main(int argc, char** argv) {
     if (argc == 2 && strcmp(argv[1], "--stream") == 0) {
@@ -132,34 +166,7 @@ int main(int argc, char** argv) {
 
     const char* serial_port = "/dev/ttyS3";
 
-    int serial_fd;
-    serial_fd = open(serial_port, O_RDWR | O_NOCTTY);
-    if (serial_fd == -1) {
-        perror("Failed to open serial port, NO UART!!!");
-    } else {
-        
-        struct termios tty;
-        memset(&tty, 0, sizeof(tty));
-
-        if (tcgetattr(serial_fd, &tty) != 0) {
-            perror("Error from tcgetattr");
-            return 1;
-        }
-
-        cfsetospeed(&tty, B115200);
-        cfsetispeed(&tty, B115200);
-
-        tty.c_cflag &= ~PARENB;
-        tty.c_cflag &= ~CSTOPB;
-        tty.c_cflag &= ~CSIZE;
-        tty.c_cflag |= CS8;
-
-        if (tcsetattr(serial_fd, TCSANOW, &tty) != 0) {
-            perror("Error from tcsetattr");
-            return 1;
-        }
-        close(serial_fd);
-    }
+    int uart_err = SetupUart(serial_port);
 
     std::ofstream uart(serial_port, std::ios::out | std::ios::binary);
     if (uart.fail()) {
@@ -170,6 +177,7 @@ int main(int argc, char** argv) {
     #endif
 
     ww_vision::FrameFetcher ff;
+    ww_vision::BlobDetector bd;
     
     std::vector<ww_vision::ColorThreshold> thresholds = {
         {
@@ -189,11 +197,13 @@ int main(int argc, char** argv) {
             thr_update_time = clock.now();
         }
 
-        auto blobs = ff.ReadBlobs(thresholds);
+        auto blobs = bd.ReadBlobs(ff.Fetch(), thresholds);
         #ifdef DESKTOP_DEBUG
         ww_vision::SendBlobs(std::cout, blobs);
         #else
-        ww_vision::SendBlobs(uart, blobs);
+        if (uart_err == 0) {
+            ww_vision::SendBlobs(uart, blobs);
+        }
         #endif
     }
 
