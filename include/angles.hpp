@@ -5,9 +5,10 @@
 #include <cstdint>
 #include <iostream>
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
-    static constexpr double kPi = 3.14159265358979323846;
+static constexpr double kPi = 3.14159265358979323846;
     static constexpr double kDoublePi = 6.28318530717958647692;
     static constexpr double kRadToDeg = 180. / kPi;
     static constexpr double kDegToRad = kPi / 180.;
@@ -141,7 +142,8 @@ namespace ww_vision {
         double ang = std::remainder(angle.rad, kDoublePi);
         return Rad(ang);
     }
-    
-} // namespace ww_vision
+
+} // namespace vision
+} // namespace ww
 
 #endif

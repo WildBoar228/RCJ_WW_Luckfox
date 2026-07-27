@@ -5,7 +5,8 @@
 #include "rcj_vision.hpp"
 #include "blob_sender.hpp"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     void SerializeInt(char* data, int val) {
         data[0] = (abs(val) >> 8) & 0xFF;
@@ -52,7 +53,7 @@ namespace ww_vision {
 
         for (const auto& color_blobs : blobs) {
             std::cout << blobs.size() << " blobs\n";
-            for (const ww_vision::BlobGeom& b : color_blobs) {
+            for (const BlobGeom& b : color_blobs) {
                 BlobInfo bi = CalcBlobInfo(b);
                 std::cout << "\n BlobGeom:\n";
                 std::cout << " > left_angle: " << bi.left_angle << '\n';
@@ -77,4 +78,5 @@ namespace ww_vision {
         #endif
     }
 
-} // namespace ww_vision
+} // namespace vision
+} // namespace ww

@@ -37,7 +37,8 @@
 
 #include "geometry.hpp"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     using ColorLab = cv::Scalar;
 
@@ -178,6 +179,7 @@ namespace ww_vision {
         void DrawBlobs(cv::Mat&, const std::vector<std::vector<BlobGeom>>&);
     };
 
-} // namespace ww_vision
+} // namespace vision
+} // namespace ww
 
 #endif

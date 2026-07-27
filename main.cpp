@@ -72,7 +72,7 @@ std::vector<std::vector<int>> parsePythonList(const std::string& s) {
     return result;
 }
 
-void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>& result) {
+void ReadThresholds(const char* thr_path, std::vector<ww::vision::ColorThreshold>& result) {
     std::ifstream in(thr_path);
     if (in.fail()) {
         std::cerr << "ERROR reading thresholds: can't open " << thr_path << std::endl;
@@ -86,7 +86,7 @@ void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>
 
     std::vector<std::vector<int>> colors = parsePythonList(text);
 
-    std::vector<ww_vision::ColorThreshold> thresholds;
+    std::vector<ww::vision::ColorThreshold> thresholds;
     for (auto& color : colors) {
         if (color.size() != 6) {
             std::cerr << "ERROR: can't read threshold: wrong count of elements ("
@@ -108,9 +108,9 @@ void ReadThresholds(const char* thr_path, std::vector<ww_vision::ColorThreshold>
         color[4] = color[4] + 128;
         color[5] = color[5] + 128;
 
-        thresholds.push_back(ww_vision::ColorThreshold{
-            ww_vision::ColorLab(color[0], color[2], color[4]),
-            ww_vision::ColorLab(color[1], color[3], color[5])
+        thresholds.push_back(ww::vision::ColorThreshold{
+            ww::vision::ColorLab(color[0], color[2], color[4]),
+            ww::vision::ColorLab(color[1], color[3], color[5])
         });
     }
 
@@ -155,7 +155,7 @@ int SetupUart(const char* serial_port) {
 
 int main(int argc, char** argv) {
     if (argc == 2 && strcmp(argv[1], "--stream") == 0) {
-        ww_vision::vision_cfg.send_stream = true;
+        ww::vision::vision_cfg.send_stream = true;
         std::cout << "--stream detected\n";
     }
 
@@ -176,13 +176,13 @@ int main(int argc, char** argv) {
     const char* thresholds_path = "/userdata/thresholds.txt";
     #endif
 
-    ww_vision::FrameFetcher ff;
-    ww_vision::BlobDetector bd;
+    ww::vision::FrameFetcher ff;
+    ww::vision::BlobDetector bd;
     
-    std::vector<ww_vision::ColorThreshold> thresholds = {
+    std::vector<ww::vision::ColorThreshold> thresholds = {
         {
-            ww_vision::ColorLab(100, 140, 140),
-            ww_vision::ColorLab(150, 200, 200)
+            ww::vision::ColorLab(100, 140, 140),
+            ww::vision::ColorLab(150, 200, 200)
         }
     };
 
@@ -201,14 +201,14 @@ int main(int argc, char** argv) {
         auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
 
         #ifdef DESKTOP_DEBUG
-        ww_vision::SendBlobs(std::cout, blobs);
+        ww::vision::SendBlobs(std::cout, blobs);
         #else
         if (uart_err == 0) {
-            ww_vision::SendBlobs(uart, blobs);
+            ww::vision::SendBlobs(uart, blobs);
         }
         #endif
 
-        if (ww_vision::vision_cfg.send_stream) {
+        if (ww::vision::vision_cfg.send_stream) {
             bd.DrawBlobs(ff.GetFrame(), blobs);
             ff.SendStream();
         }

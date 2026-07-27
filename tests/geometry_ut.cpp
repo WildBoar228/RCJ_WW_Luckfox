@@ -1,10 +1,10 @@
-// geomtry_test.cpp
+// geometry_test.cpp
 #include <gtest/gtest.h>
 #include <cmath>
 #include "geometry.hpp"
 
 namespace {
-    using namespace ww_vision;
+    using namespace ww::vision;
 
     static constexpr double kEps = 1e-9;
 

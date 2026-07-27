@@ -6,10 +6,12 @@
 
 #include "rcj_vision.hpp"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     void SendBlobs(std::ostream&, const std::vector<std::vector<BlobGeom>>&);
 
-} // namespace ww_vision
+} // namespace vision
+} // namespace ww
 
 #endif

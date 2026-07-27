@@ -9,7 +9,8 @@
 #include "rcj_vision.hpp"
 #include "luckfox_mpi.h"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     VisionConfig vision_cfg;
 
@@ -516,4 +517,5 @@ namespace ww_vision {
         }
     }
 
-} // namespace ww_vision
+} // namespace vision
+} // namespace ww

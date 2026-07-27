@@ -7,7 +7,7 @@
 
 namespace {
 
-    using namespace ww_vision;
+    using namespace ww::vision;
 
     constexpr double kEps = 1e-9;
 

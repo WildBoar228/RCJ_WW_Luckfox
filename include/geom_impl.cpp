@@ -3,7 +3,8 @@
 
 #include "geometry.hpp"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     namespace utils {
 
@@ -136,4 +137,5 @@ namespace ww_vision {
         return min_dist;
     }
 
-} // namespace ww_vision
+} // namespace vision
+} // namespace ww

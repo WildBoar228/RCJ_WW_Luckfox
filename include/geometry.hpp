@@ -3,7 +3,8 @@
 
 #include "angles.hpp"
 
-namespace ww_vision {
+namespace ww {
+namespace vision {
 
     struct Point{
         int x = 0;
@@ -11,8 +12,8 @@ namespace ww_vision {
     };
 
     template <typename CvPoint>
-    ww_vision::Point CastToPoint(const CvPoint& p) {
-        return ww_vision::Point{
+    Point CastToPoint(const CvPoint& p) {
+        return Point{
             .x = static_cast<int>(p.x),
             .y = static_cast<int>(p.y)
         };
@@ -62,7 +63,8 @@ namespace ww_vision {
     constexpr bool SegmentIntersection(Segment s1, Segment s2, Point &p);
     constexpr int CalcPolygonDist(Segment ray, const BlobGeom& blob);
 
-} // namespace ww_geom
+} // namespace vision
+} // namespace ww
 
 #include "geom_impl.cpp"
 
