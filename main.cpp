@@ -197,7 +197,9 @@ int main(int argc, char** argv) {
             thr_update_time = clock.now();
         }
 
-        auto blobs = bd.ReadBlobs(ff.Fetch(), thresholds);
+        ff.Fetch();
+        auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
+
         #ifdef DESKTOP_DEBUG
         ww_vision::SendBlobs(std::cout, blobs);
         #else
@@ -205,6 +207,11 @@ int main(int argc, char** argv) {
             ww_vision::SendBlobs(uart, blobs);
         }
         #endif
+
+        if (ww_vision::vision_cfg.send_stream) {
+            bd.DrawBlobs(ff.GetFrame(), blobs);
+            ff.SendStream();
+        }
     }
 
     return 0;

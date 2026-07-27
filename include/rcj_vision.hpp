@@ -145,24 +145,24 @@ namespace ww_vision {
     public:
         FrameFetcher();
 
-        cv::Mat& Fetch();
+        void Fetch();
+        cv::Mat& GetFrame() { return frame; }
+        void SendStream();
 
         ~FrameFetcher();
     };
 
     class BlobDetector {
-        #ifdef DESKTOP_DEBUG
-        cv::Mat result;
-        #endif
-
         cv::Mat lab;
         cv::Mat mask;
 
         static constexpr int max_color_blobs_ = 2;
     
     public:
-        auto ReadBlobs(cv::Mat& mat, const std::vector<ColorThreshold>&)
-            -> std::vector<std::vector<BlobGeom>>;
+        auto ReadBlobs(
+            cv::Mat& mat,
+            const std::vector<ColorThreshold>&
+        ) -> std::vector<std::vector<BlobGeom>>;
 
         void DrawRay(cv::Mat& result, const Segment& segm,
                      cv::Scalar color = cv::Scalar(0, 0, 255), int width = 1) {
@@ -174,6 +174,8 @@ namespace ww_vision {
             );
         }
         void DrawBlob(cv::Mat&, const BlobGeom&, cv::Scalar color);
+
+        void DrawBlobs(cv::Mat&, const std::vector<std::vector<BlobGeom>>&);
     };
 
 } // namespace ww_vision
