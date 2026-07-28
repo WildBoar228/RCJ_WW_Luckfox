@@ -153,11 +153,25 @@ int SetupUart(const char* serial_port) {
 #endif
 
 
-int main(int argc, char** argv) {
-    if (argc == 2 && strcmp(argv[1], "--stream") == 0) {
-        ww::vision::vision_cfg.send_stream = true;
-        std::cout << "--stream detected\n";
+bool GetParameter(int argc, char** argv, const char* name, bool default_value = false) {
+    bool value = default_value;
+    for (int i = 1; i < argc; ++i) {
+        if (strncmp(argv[1], "--no-", sizeof("--no-") - 1) == 0) {
+            value = false;
+        } else if (strncmp(argv[1], "--", sizeof("--") - 1) == 0) {
+            value = true;
+        }
     }
+    return value;
+}
+
+
+int main(int argc, char** argv) {
+    ww::vision::vision_cfg.send_stream = GetParameter(argc, argv, "stream", true);
+    ww::vision::vision_cfg.draw_blobs = GetParameter(argc, argv, "draw-blobs", true);
+
+    printf("send_stream: %d\n", ww::vision::vision_cfg.send_stream);
+    printf("draw_blobs: %d\n", ww::vision::vision_cfg.draw_blobs);
 
     #ifdef DESKTOP_DEBUG
     std::cout << "BUILD_DESKTOP_DEBUG\n";
@@ -208,8 +222,11 @@ int main(int argc, char** argv) {
         }
         #endif
 
-        if (ww::vision::vision_cfg.send_stream) {
+        if (ww::vision::vision_cfg.draw_blobs) {
             bd.DrawBlobs(ff.GetFrame(), blobs);
+        }
+
+        if (ww::vision::vision_cfg.send_stream) {
             ff.SendStream();
         }
     }

@@ -66,7 +66,8 @@ namespace vision {
         int frame_height = 480;
         Point center{320, 240};
         bool dist_to_center = false;
-        bool send_stream = false;
+        bool send_stream = true;
+        bool draw_blobs = true;
         std::vector<cv::Scalar> default_thr_colors{
             cv::Scalar(0, 150, 150),
             cv::Scalar(200, 0, 0)
