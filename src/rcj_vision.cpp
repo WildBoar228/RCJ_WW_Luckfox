@@ -504,8 +504,8 @@ namespace vision {
         cv::imshow("Mask", mask);
         #endif
 
+        size_t color_idx = 0;
         for (const auto& color_blobs : blobs) {
-            size_t color_idx = 0;
             for (const BlobGeom& blob : color_blobs) {
                 if (color_idx < vision_cfg.default_thr_colors.size()) {
                     DrawBlob(frame, blob, vision_cfg.default_thr_colors[color_idx]);

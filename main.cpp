@@ -156,10 +156,14 @@ int SetupUart(const char* serial_port) {
 bool GetParameter(int argc, char** argv, const char* name, bool default_value = false) {
     bool value = default_value;
     for (int i = 1; i < argc; ++i) {
-        if (strncmp(argv[1], "--no-", sizeof("--no-") - 1) == 0) {
-            value = false;
-        } else if (strncmp(argv[1], "--", sizeof("--") - 1) == 0) {
-            value = true;
+        if (strncmp(argv[i], "--no-", sizeof("--no-") - 1) == 0) {
+            if (strcmp(argv[i] + sizeof("--no-") - 1, name) == 0) {
+                value = false;
+            }
+        } else if (strncmp(argv[i], "--", sizeof("--") - 1) == 0) {
+            if (strcmp(argv[i] + sizeof("--") - 1, name) == 0) {
+                value = true;
+            }
         }
     }
     return value;
