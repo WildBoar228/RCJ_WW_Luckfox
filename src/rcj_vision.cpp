@@ -281,7 +281,7 @@ namespace vision {
         h264_frame.stVFrame.u32Height = height;
         h264_frame.stVFrame.u32VirWidth = width;
         h264_frame.stVFrame.u32VirHeight = height;
-        h264_frame.stVFrame.enPixelFormat =  RK_FMT_RGB888; 
+        h264_frame.stVFrame.enPixelFormat =  RK_FMT_BGR888; 
         h264_frame.stVFrame.u32FrameFlag = 160;
         h264_frame.stVFrame.pMbBlk = src_Blk;
         data = (unsigned char *)RK_MPI_MB_Handle2VirAddr(src_Blk);
@@ -352,7 +352,7 @@ namespace vision {
 
 			cv::Mat yuv420sp(height + height / 2, width, CV_8UC1, vi_data);
 			cv::Mat bgr(height, width, CV_8UC3, data);			
-			cv::cvtColor(yuv420sp, bgr, cv::COLOR_YUV420sp2BGR);
+			cv::cvtColor(yuv420sp, bgr, cv::COLOR_YUV2BGR_NV12);
 			cv::resize(bgr, frame, cv::Size(width ,height), 0, 0, cv::INTER_LINEAR);
 		} else {
 			RK_LOGE("RK_MPI_VI_GetChnFrame fail %x", s32Ret);
