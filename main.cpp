@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
                     std::cout << "WARNING: failed to update config\n";
                 } else {
                     ww::vision::vision_cfg.draw_blobs = cfg_opt->draw_blobs;
-                    thresholds = std::move(cfg_opt->thresholds);
+                    thresholds = cfg_opt->thresholds;
                     
                     std::cout << "Thresholds updated:\n";
                     for (auto& thr : thresholds) {

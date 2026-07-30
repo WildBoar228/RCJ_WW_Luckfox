@@ -30,14 +30,16 @@ namespace vision {
         std::ostream& out,
         const std::vector<std::vector<BlobGeom>>& blobs
     ) {
+        static constexpr int kSendColors = 2;
         static constexpr int kBlobInfoLen = sizeof(int16_t) * 7;
-        static constexpr int kPackageLen = 2 + 2 * kBlobInfoLen;
+        static constexpr int kPackageLen = 2 + kSendColors * kBlobInfoLen;
         static char data[kPackageLen];
         memset(data, 0, sizeof(data));
         data[0] = data[1] = 0xFF;
         int write_index = 2;
 
-        for (const auto& color_blobs : blobs) {
+        for (int i = 0; i < kSendColors; ++i) {
+            const auto& color_blobs = blobs[i];
             if (!color_blobs.empty()) {
                 BlobInfo bi = CalcBlobInfo(color_blobs[0]);
                 SerializeBlob(&data[write_index], bi);
