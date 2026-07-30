@@ -2,6 +2,7 @@
 #define _RCJ_WW_LUCKFOX_RCJ_VISION_HPP_
 
 #include <cstdint>
+#include <iostream>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -49,6 +50,29 @@ namespace vision {
         ColorLab lower;
         ColorLab upper;
     };
+    
+    inline std::istream& operator>>(std::istream& in, ColorThreshold& ct) {
+        in >> ct.lower[0] >> ct.upper[0]
+           >> ct.lower[1] >> ct.upper[1]
+           >> ct.lower[2] >> ct.upper[2];
+
+        ct.lower[0] = ct.lower[0] * 255 / 100;
+        ct.upper[0] = ct.upper[0] * 255 / 100;
+        ct.lower[1] += 128;
+        ct.upper[1] += 128;
+        ct.lower[2] += 128;
+        ct.upper[2] += 128;
+
+        return in;
+    }
+    
+    inline std::ostream& operator<<(std::ostream& out, const ColorThreshold& ct) {
+        out << "("
+            << ct.lower[0] << ".." << ct.upper[0] << "  "
+            << ct.lower[1] << ".." << ct.upper[1] << "  "
+            << ct.lower[2] << ".." << ct.upper[2] << ")";
+        return out;
+    }
 
     struct BlobInfo {
         Deg left_angle = 360_deg;

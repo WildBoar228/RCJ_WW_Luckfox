@@ -233,7 +233,7 @@ namespace vision {
     void FrameFetcher::SendStream() {
         cv::imshow("Detected", frame);
 
-        std::getchar();
+        // std::getchar();
         int key = cv::waitKey(1);
         if (key == 27 || key == 'q') {
             std::exit(0);

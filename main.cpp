@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -14,109 +15,6 @@
 #include "rcj_vision.hpp"
 #include "blob_sender.hpp"
 
-
-std::vector<std::vector<int>> parsePythonList(const std::string& s) {
-    std::vector<std::vector<int>> result;
-    std::vector<int> current;
-
-    int depth = 0;
-    size_t i = 0;
-
-    while (i < s.size()) {
-        char c = s[i];
-
-        if (c == '[') {
-            ++depth;
-
-            // Начало внутреннего списка
-            if (depth == 2) {
-                current.clear();
-            }
-
-            ++i;
-        }
-        else if (c == ']') {
-            // Конец внутреннего списка
-            if (depth == 2) {
-                result.push_back(current);
-            }
-
-            --depth;
-            ++i;
-        }
-        else if ((c == '-') || std::isdigit(static_cast<unsigned char>(c))) {
-            int sign = 1;
-
-            if (c == '-') {
-                sign = -1;
-                ++i;
-            }
-
-            int value = 0;
-            while (i < s.size() &&
-                   std::isdigit(static_cast<unsigned char>(s[i]))) {
-                value = value * 10 + (s[i] - '0');
-                ++i;
-            }
-
-            // Добавляем только если находимся внутри внутреннего списка
-            if (depth == 2) {
-                current.push_back(sign * value);
-            }
-        }
-        else {
-            ++i; // пропускаем пробелы и запятые
-        }
-    }
-
-    return result;
-}
-
-void ReadThresholds(const char* thr_path, std::vector<ww::vision::ColorThreshold>& result) {
-    std::ifstream in(thr_path);
-    if (in.fail()) {
-        std::cerr << "ERROR reading thresholds: can't open " << thr_path << std::endl;
-        return;
-    }
-    std::string text;
-    std::string word;
-    while (in >> word) {
-        text += word + " ";
-    }
-
-    std::vector<std::vector<int>> colors = parsePythonList(text);
-
-    std::vector<ww::vision::ColorThreshold> thresholds;
-    for (auto& color : colors) {
-        if (color.size() != 6) {
-            std::cerr << "ERROR: can't read threshold: wrong count of elements ("
-                      << color.size() << "): ";
-            for (int c : color) {
-                std::cerr << c << " ";
-            }
-            std::cerr << std::endl;
-            return;
-        }
-
-        // L from 0..100 to 0..255
-        color[0] = color[0] * 255 / 100;
-        color[1] = color[1] * 255 / 100;
-        // A from -128..127 to 0..255
-        color[2] = color[2] + 128;
-        color[3] = color[3] + 128;
-        // B from -128..127 to 0..255
-        color[4] = color[4] + 128;
-        color[5] = color[5] + 128;
-
-        thresholds.push_back(ww::vision::ColorThreshold{
-            ww::vision::ColorLab(color[0], color[2], color[4]),
-            ww::vision::ColorLab(color[1], color[3], color[5])
-        });
-    }
-
-    thresholds.resize(2);
-    result = thresholds;
-}
 
 #ifndef DESKTOP_DEBUG
 int SetupUart(const char* serial_port) {
@@ -170,16 +68,59 @@ bool GetParameter(int argc, char** argv, const char* name, bool default_value = 
 }
 
 
+struct RuntimeCfg {
+    bool draw_blobs;
+    std::vector<ww::vision::ColorThreshold> thresholds;
+} runtime_cfg;
+
+bool CheckVarName(std::istream& in, const char* expected) {
+    std::string word;
+    in >> word;
+    if (word != expected) {
+        std::cout << "Syntax error, \"" << expected << "\" expected" << std::endl;
+        return false;
+    }
+    return true;
+}
+
+std::optional<RuntimeCfg> ReadRuntimeCfg(const char* src_name) {
+    std::ifstream fin(src_name);
+    if (!fin) {
+        std::cout << "ERROR: can't read " << src_name << std::endl;
+        return std::nullopt;
+    }
+
+    RuntimeCfg cfg;
+
+    if (!CheckVarName(fin, "draw_blobs")) { return std::nullopt; }
+    fin >> cfg.draw_blobs;
+
+    if (!CheckVarName(fin, "thr_cnt")) { return std::nullopt; }
+    int thr_cnt;
+    fin >> thr_cnt;
+
+    cfg.thresholds.resize(thr_cnt);
+    for (int i = 0; i < thr_cnt; ++i) {
+        if (!CheckVarName(fin, "thr")) { return std::nullopt; }
+        fin >> cfg.thresholds[i];
+        if (fin.fail()) { return std::nullopt; }
+    }
+    
+    return cfg;
+}
+
+
 int main(int argc, char** argv) {
     ww::vision::vision_cfg.send_stream = GetParameter(argc, argv, "stream", true);
     ww::vision::vision_cfg.draw_blobs = GetParameter(argc, argv, "draw-blobs", true);
+    bool update_runtime_cfg = GetParameter(argc, argv, "runtime-cfg", true);
 
     printf("send_stream: %d\n", ww::vision::vision_cfg.send_stream);
     printf("draw_blobs: %d\n", ww::vision::vision_cfg.draw_blobs);
 
     #ifdef DESKTOP_DEBUG
     std::cout << "BUILD_DESKTOP_DEBUG\n";
-    const char* thresholds_path = "thresholds.txt";
+    const char* runtime_cfg_path = "runtime.cfg";
     #else
 
     const char* serial_port = "/dev/ttyS3";
@@ -191,7 +132,7 @@ int main(int argc, char** argv) {
         std::cerr << "ERROR: can't write to ttyS3" << std::endl;
     }
 
-    const char* thresholds_path = "/userdata/thresholds.txt";
+    const char* runtime_cfg_path = "/userdata/runtime.cfg";
     #endif
 
     ww::vision::FrameFetcher ff;
@@ -206,13 +147,26 @@ int main(int argc, char** argv) {
 
     auto clock = std::chrono::steady_clock();
 
-    auto thr_update_time = clock.now();
-    auto thr_update_interval = std::chrono::seconds(2);
+    auto cfg_update_time = clock.now();
+    auto cfg_update_interval = std::chrono::seconds(2);
 
     while (true) {
-        if (clock.now() - thr_update_time > thr_update_interval) {
-            ReadThresholds(thresholds_path, thresholds);
-            thr_update_time = clock.now();
+        if (update_runtime_cfg) {
+            if (clock.now() - cfg_update_time > cfg_update_interval) {
+                auto cfg_opt = ReadRuntimeCfg(runtime_cfg_path);
+                if (!cfg_opt) {
+                    std::cout << "WARNING: failed to update config\n";
+                } else {
+                    ww::vision::vision_cfg.draw_blobs = cfg_opt->draw_blobs;
+                    thresholds = std::move(cfg_opt->thresholds);
+                    
+                    std::cout << "Thresholds updated:\n";
+                    for (auto& thr : thresholds) {
+                        std::cout << thr << "\n";
+                    }
+                }
+                cfg_update_time = clock.now();
+            }
         }
 
         ff.Fetch();

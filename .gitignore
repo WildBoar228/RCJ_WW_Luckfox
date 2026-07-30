@@ -5,4 +5,5 @@
 .env
 
 *.txt
+*.cfg
 connect.sh

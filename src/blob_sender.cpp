@@ -45,14 +45,10 @@ namespace vision {
             write_index += kBlobInfoLen;
         }
 
-        std::cout << "write data: ";
-        for (int i = 0; i < kPackageLen; ++i) {
-            std::cout << std::hex << static_cast<int>(data[i]) << " ";
-        }
-        std::cout << std::dec << std::endl;
-
         for (const auto& color_blobs : blobs) {
-            std::cout << blobs.size() << " blobs\n";
+            if (!color_blobs.empty()) {
+                std::cout << color_blobs.size() << " blobs\n";
+            }
             for (const BlobGeom& b : color_blobs) {
                 BlobInfo bi = CalcBlobInfo(b);
                 std::cout << "\n BlobGeom:\n";
