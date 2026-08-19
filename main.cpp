@@ -13,6 +13,7 @@
 #endif
 
 #include "rcj_vision.hpp"
+#include "rcj_neurovision.hpp"
 #include "blob_sender.hpp"
 
 
@@ -133,11 +134,12 @@ int main(int argc, char** argv) {
     }
 
     const char* runtime_cfg_path = "/userdata/runtime.cfg";
+    const char* gate_model_path = "/root/best-int8.rknn";
     #endif
 
     ww::vision::FrameFetcher ff;
     ww::vision::ThresholdBlobDetector bd;
-    ww::vision::GateSegmentDetector gate_detector;
+    ww::vision::GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
     
     std::vector<ww::vision::ColorThreshold> thresholds = {
         {

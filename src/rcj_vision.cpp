@@ -517,9 +517,5 @@ namespace vision {
         }
     }
 
-    class GateSegmentDetector::Impl {
-        
-    };
-
 } // namespace vision
 } // namespace ww

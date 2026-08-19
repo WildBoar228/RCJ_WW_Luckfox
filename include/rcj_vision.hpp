@@ -207,23 +207,6 @@ namespace vision {
         void DrawBlobs(cv::Mat&, const std::vector<std::vector<BlobGeom>>&);
     };
 
-    struct FieldObjects {
-        std::vector<Segment> yellow_gates;
-        std::vector<Segment> blue_gates;
-    };
-
-    class GateSegmentDetector {
-        class Impl;
-        std::unique_ptr<Impl> pimpl_;
-        static constexpr int max_one_color_gates_ = 2;
-
-    public:
-        GateSegmentDetector();
-        std::optional<FieldObjects> Detect(cv::Mat&);
-        static void DrawResult(cv::Mat&, const FieldObjects&);
-        ~GateSegmentDetector();
-    };
-
 } // namespace vision
 } // namespace ww
 

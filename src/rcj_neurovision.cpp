@@ -2,6 +2,8 @@
 #include "rknn_api.h"
 #endif
 #include "rcj_vision.hpp"
+#include "rcj_neurovision.hpp"
+#include "postprocess.h"
 #include <opencv2/core.hpp>
 
 #include <algorithm>
@@ -9,13 +11,10 @@
 #include <optional>
 #include <vector>
 
+namespace ww {
+namespace vision {
+
 namespace {
-    struct LetterboxResult {
-        cv::Mat rgb;
-        float scale;
-        int pad_x;
-        int pad_y;
-    };
 
     LetterboxResult Letterbox(const cv::Mat& frame, int width, int height) {
         float scale = std::min(
@@ -53,33 +52,19 @@ namespace {
         return {std::move(rgb), scale, pad_x, pad_y};
     }
 
-    struct GateSegmentCandidate {
-        int color;
-        cv::Point2f left;
-        cv::Point2f right;
-        float confidence; 
-    };
-
-    ww::vision::Point RestorePointFromLetterbox(
+    ww::vision::Point PointFromDetection(
         const cv::Mat& frame,
-        const LetterboxResult& prep,
         cv::Point2f point) {
-        
-        point.x = (point.x - prep.pad_x) / prep.scale;
-        point.y = (point.y - prep.pad_y) / prep.scale;
 
         point.x = std::clamp(point.x, 0.0f, float(frame.cols - 1));
         point.y = std::clamp(point.y, 0.0f, float(frame.rows - 1));
 
         return ww::vision::PointFromImage(point);
     }
-}
-
-namespace ww {
-namespace vision {
+} // namespace
 
 #define GRACEFUL_ASSERT(val, msg, err_code) \
-if (val) { RK_LOGE(msg); return err_code; }
+if (!(val)) { RK_LOGE(msg); return err_code; }
 
 #define GRACEFUL_ASSERT_EQ(exp, actual, msg, err_code)  \
 if (exp != actual) {                                    \
@@ -96,201 +81,222 @@ if (exp == actual) {                                    \
 }
 
 #ifndef DESKTOP_DEBUG
-    static constexpr int kExpectedWidth = 320;
-    static constexpr int kExpectedHeight = 320;
-    static constexpr int kOutputChannels = 12;
 
-    static constexpr float kDetectionThreshold = 0;
-    static constexpr float kKeypointThreshold = 0;
+    ModelHandler::ModelHandler(char* model_path) {
+        RK_LOGI("Initialize model...");
+        GRACEFUL_ASSERT_EQ(
+            (rknn_init(&context, model_path, 0, 0, nullptr)),
+            RKNN_SUCC,
+            "rknn_init", );
 
-    enum ModelChannel {
-        kBoxCenterX = 0,
-        kBoxCenterY = 1,
-        kBoxWidth = 2,
-        kBoxHeight = 3,
-        kYellowScore = 4,
-        kBlueScore = 5,
-        kLeftPointX = 6,
-        kLeftPointY = 7,
-        kLeftPointConfidence = 8,
-        kRightPointX = 9,
-        kRightPointY = 10,
-        kRightPointConfidence = 11
-    };
+        if (!ValidateModel()) {
+            rknn_destroy(context);
+            context = 0;
+            return;
+        }
+    }
 
-    class GateSegmentDetector::Impl {
-    public:
-        rknn_context context = 0;
-        rknn_tensor_attr input_attr{};
-        rknn_tensor_attr output_attr{};
+    ModelHandler::~ModelHandler() {
+        if (context != 0) {
+            rknn_destroy(context);
+        }
+    }
 
-        int input_width = 0;
-        int input_height = 0;
+    bool ModelHandler::ValidateModel() {
+        RK_LOGI("Validate model...");
 
-        const char* kModelPath = "/root/best-int8.rknn";
+        GRACEFUL_ASSERT_EQ(
+            (rknn_query(context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num))),
+            RKNN_SUCC,
+            "RKNN_QUERY_IN_OUT_NUM failed", false);
 
-        bool ValidateModel() {
-            RK_LOGI("Validate model...");
-            rknn_input_output_num io_num{};
+        GRACEFUL_ASSERT_EQ(
+            (io_num.n_input), 1,
+            "wrong io_num.n_input", false);
 
-            GRACEFUL_ASSERT_EQ(
-                (rknn_query(context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num))),
-                RKNN_SUCC,
-                "RKNN_QUERY_IN_OUT_NUM failed", false);
+        GRACEFUL_ASSERT_EQ(
+            (io_num.n_output), kModelOutputNum,
+            "wrong io_num.n_output", false);
 
-            GRACEFUL_ASSERT_EQ(
-                (io_num.n_input), 1,
-                "wrong io_num.n_input", false);
+        input_attrs[0].index = 0;
+        GRACEFUL_ASSERT_EQ(
+            (rknn_query(
+                context, RKNN_QUERY_INPUT_ATTR,
+                &input_attrs[0], sizeof(input_attrs[0])
+            )),
+            RKNN_SUCC,
+            "RKNN_QUERY_INPUT_ATTR failed", false);
 
-            GRACEFUL_ASSERT_EQ(
-                (io_num.n_output), 1,
-                "wrong io_num.n_output", false);
-
-            input_attr.index = 0;
-            GRACEFUL_ASSERT_EQ(
-                (rknn_query(
-                    context, RKNN_QUERY_INPUT_ATTR,
-                    &input_attr, sizeof(input_attr)
-                )),
-                RKNN_SUCC,
-                "RKNN_QUERY_INPUT_ATTR failed", false);
-
-            output_attr.index = 0;
+        for (int i = 0; i < kModelOutputNum; ++i) {
+            output_attrs[i].index = i;
             GRACEFUL_ASSERT_EQ(
                 (rknn_query(
                     context, RKNN_QUERY_OUTPUT_ATTR,
-                    &output_attr, sizeof(output_attr)
+                    &output_attrs[i], sizeof(output_attrs[i])
                 )),
                 RKNN_SUCC,
                 "RKNN_QUERY_OUTPUT_ATTR failed", false);
-
-            if (input_attr.fmt == RKNN_TENSOR_NCHW) {
-                input_height = input_attr.dims[2];
-                input_width = input_attr.dims[3];
-            } else {
-                input_height = input_attr.dims[1];
-                input_width = input_attr.dims[2];
-            }
-
-            GRACEFUL_ASSERT_EQ(
-                input_width, kExpectedWidth,
-                "Wrong model width", false);
-
-            GRACEFUL_ASSERT_EQ(
-                input_height, kExpectedHeight,
-                "Wrong model height", false);
-
-            GRACEFUL_ASSERT_EQ(
-                (output_attr.n_elems % kOutputChannels), 0,
-                "n_elems \% channels", false);
-
-            RK_LOGI("Model is correct!");
-            return true;
         }
 
-        Impl() {
-            RK_LOGI("Initialize model...");
+        const auto& input_attr = input_attrs[0];
+        GRACEFUL_ASSERT_EQ(
+            input_attr.n_dims, 4,
+            "Input must have four dimensions", false);
+        if (input_attr.fmt == RKNN_TENSOR_NCHW) {
+            input_height = input_attr.dims[2];
+            input_width = input_attr.dims[3];
             GRACEFUL_ASSERT_EQ(
-                (rknn_init(&context, const_cast<char*>(kModelPath), 0, 0, nullptr)),
-                RKNN_SUCC,
-                "rknn_init", );
-                
-            if (!ValidateModel()) {
-                rknn_destroy(context);
-                context = 0;
-                return;
-            }
+                input_attr.dims[1], 3,
+                "Wrong model input channels", false);
+        } else {
+            input_height = input_attr.dims[1];
+            input_width = input_attr.dims[2];
+            GRACEFUL_ASSERT_EQ(
+                input_attr.dims[3], 3,
+                "Wrong model input channels", false);
         }
 
-        template <typename ValueGetter>
-        std::optional<GateSegmentCandidate> DecodeGate(int i, ValueGetter&& value) {
-            float yellow_score = value(kYellowScore, i);
-            float blue_score = value(kBlueScore, i);
+        GRACEFUL_ASSERT_EQ(
+            input_width, kExpectedWidth,
+            "Wrong model width", false);
 
-            int color = blue_score > yellow_score ? 1 : 0;
-            float score = std::max(yellow_score, blue_score);
+        GRACEFUL_ASSERT_EQ(
+            input_height, kExpectedHeight,
+            "Wrong model height", false);
 
-            if (score < kDetectionThreshold ||
-                value(kLeftPointConfidence, i) < kKeypointThreshold ||
-                value(kRightPointConfidence, i) < kKeypointThreshold) {
-                return std::nullopt;
+        constexpr std::array<int, kDetectionHeadNum> grid_sizes{40, 20, 10};
+        for (int i = 0; i < kDetectionHeadNum; ++i) {
+            const auto& attr = output_attrs[i];
+            const int grid = grid_sizes[i];
+
+            GRACEFUL_ASSERT_EQ(
+                attr.n_dims, 4,
+                "Detection output must have four dimensions", false);
+            GRACEFUL_ASSERT_EQ(
+                attr.fmt, RKNN_TENSOR_NCHW,
+                "Detection output must use NCHW", false);
+            GRACEFUL_ASSERT_EQ(
+                attr.dims[0], 1,
+                "Wrong detection output batch", false);
+            GRACEFUL_ASSERT_EQ(
+                attr.dims[1], kDetectionOutputChannels,
+                "Wrong detection output channels", false);
+            GRACEFUL_ASSERT_EQ(
+                static_cast<int>(attr.dims[2]), grid,
+                "Wrong detection output height", false);
+            GRACEFUL_ASSERT_EQ(
+                static_cast<int>(attr.dims[3]), grid,
+                "Wrong detection output width", false);
+            GRACEFUL_ASSERT(
+                attr.type == RKNN_TENSOR_INT8 ||
+                attr.type == RKNN_TENSOR_UINT8 ||
+                attr.type == RKNN_TENSOR_FLOAT16 ||
+                attr.type == RKNN_TENSOR_FLOAT32,
+                "Unsupported detection output type", false);
+        }
+
+        const auto& keypoint_attr = output_attrs[3];
+        GRACEFUL_ASSERT_EQ(
+            keypoint_attr.n_dims, 4,
+            "Keypoint output must have four dimensions", false);
+        GRACEFUL_ASSERT_EQ(
+            keypoint_attr.dims[0], 1,
+            "Wrong keypoint output batch", false);
+        GRACEFUL_ASSERT_EQ(
+            keypoint_attr.dims[1], kKeypointNum,
+            "Wrong number of keypoints", false);
+        GRACEFUL_ASSERT_EQ(
+            keypoint_attr.dims[2], kKeypointDimensions,
+            "Wrong keypoint dimensions", false);
+        GRACEFUL_ASSERT_EQ(
+            keypoint_attr.dims[3], kTotalAnchors,
+            "Wrong keypoint anchor count", false);
+        GRACEFUL_ASSERT(
+            keypoint_attr.type == RKNN_TENSOR_INT8 ||
+            keypoint_attr.type == RKNN_TENSOR_UINT8 ||
+            keypoint_attr.type == RKNN_TENSOR_FLOAT16 ||
+            keypoint_attr.type == RKNN_TENSOR_FLOAT32,
+            "Unsupported keypoint output type", false);
+
+        is_quant =
+            output_attrs[0].qnt_type == RKNN_TENSOR_QNT_AFFINE_ASYMMETRIC &&
+            (output_attrs[0].type == RKNN_TENSOR_INT8 ||
+             output_attrs[0].type == RKNN_TENSOR_UINT8);
+
+        for (int i = 1; i < kDetectionHeadNum; ++i) {
+            const bool output_is_quant =
+                output_attrs[i].qnt_type == RKNN_TENSOR_QNT_AFFINE_ASYMMETRIC &&
+                (output_attrs[i].type == RKNN_TENSOR_INT8 ||
+                 output_attrs[i].type == RKNN_TENSOR_UINT8);
+            GRACEFUL_ASSERT_EQ(
+                output_is_quant, is_quant,
+                "Detection heads use inconsistent quantization", false);
+        }
+
+        RK_LOGI("Model is correct!");
+        return true;
+    }
+
+    FieldObjects ProcessGateCandidates(
+        const cv::Mat& frame,
+        std::vector<GateSegmentCandidate>& candidates,
+        int max_one_color_gates
+    ) {
+        auto middle = std::partition(
+            candidates.begin(), candidates.end(),
+            [](const GateSegmentCandidate& candidate) {
+                return candidate.color == 0;
             }
+        );
 
-            return GateSegmentCandidate{
-                color,
-                cv::Point2f{value(kLeftPointX, i), value(kLeftPointY, i)},
-                cv::Point2f{value(kRightPointX, i), value(kRightPointY, i)},
-                std::min(score,
-                    std::min(
-                        value(kLeftPointConfidence, i),
-                        value(kRightPointConfidence, i)))
+        auto comp_candidates =
+            [](const GateSegmentCandidate& lhs, const GateSegmentCandidate& rhs) {
+                return lhs.confidence > rhs.confidence;
             };
+
+        std::sort(candidates.begin(), middle, comp_candidates);
+        std::sort(middle, candidates.end(), comp_candidates);
+
+        FieldObjects fo;
+        auto last_yellow = candidates.begin() + std::min(
+            static_cast<int>(middle - candidates.begin()),
+            max_one_color_gates);
+
+        auto last_blue = middle + std::min(
+            static_cast<int>(candidates.end() - middle),
+            max_one_color_gates);
+
+        for (auto iter = candidates.begin(); iter != last_yellow; ++iter) {
+            fo.yellow_gates.emplace_back(Segment(
+                PointFromDetection(frame, iter->left),
+                PointFromDetection(frame, iter->right)
+            ));
         }
-
-        FieldObjects ProcessGateCandidates(
-            const cv::Mat& frame,
-            const LetterboxResult& prep,
-            std::vector<GateSegmentCandidate>& candidates) {
-            
-            auto middle = candidates.begin();
-            
-            std::partition(candidates.begin(), candidates.end(),
-                [](const GateSegmentCandidate& cand){ return cand.color; });
-            
-            auto comp_candidates =
-                [](const GateSegmentCandidate& lhs, const GateSegmentCandidate& rhs) {
-                    return lhs.confidence < rhs.confidence;
-                };
-
-            std::sort(candidates.begin(), middle, comp_candidates);
-            std::sort(middle, candidates.end(), comp_candidates);
-
-            FieldObjects fo;
-            auto last_yellow = (
-                middle - candidates.begin() < max_one_color_gates_
-                ? candidates.begin() + max_one_color_gates_
-                : middle);
-
-            auto last_blue = (
-                candidates.end() - middle < max_one_color_gates_
-                ? middle + max_one_color_gates_
-                : candidates.end());
-            
-            for (auto iter = candidates.begin(); iter != last_yellow; ++iter) {
-                fo.yellow_gates.emplace_back(Segment(
-                    RestorePointFromLetterbox(frame, prep, iter->left),
-                    RestorePointFromLetterbox(frame, prep, iter->right)
-                ));
-            }
-            for (auto iter = middle; iter != last_blue; ++iter) {
-                fo.blue_gates.emplace_back(Segment(
-                    RestorePointFromLetterbox(frame, prep, iter->left),
-                    RestorePointFromLetterbox(frame, prep, iter->right)
-                ));
-            }
-            return fo;
+        for (auto iter = middle; iter != last_blue; ++iter) {
+            fo.blue_gates.emplace_back(Segment(
+                PointFromDetection(frame, iter->left),
+                PointFromDetection(frame, iter->right)
+            ));
         }
+        return fo;
+    }
 
-        ~Impl() {
-            if (context != 0) {
-                rknn_destroy(context);
-            }
-        }
-    };
-
-    GateSegmentDetector::GateSegmentDetector()
-        : pimpl_(std::make_unique<Impl>()) {}
+    GateSegmentDetector::GateSegmentDetector(char* model_path)
+        : model_(model_path) {}
 
     auto GateSegmentDetector::Detect(cv::Mat& frame)
         -> std::optional<FieldObjects> {
             
         GRACEFUL_ASSERT_NEQ(
-            (pimpl_->context),
+            (model_.context),
             0,
             "rknn hasn't initialized", (std::nullopt));
+        GRACEFUL_ASSERT(
+            !frame.empty(),
+            "input frame is empty", (std::nullopt));
 
         auto prep = Letterbox(
-            frame, pimpl_->input_width, pimpl_->input_height
+            frame, model_.input_width, model_.input_height
         );
 
         rknn_input input{};
@@ -304,42 +310,82 @@ if (exp == actual) {                                    \
         input.pass_through = 0;
 
         GRACEFUL_ASSERT(
-            (rknn_inputs_set(pimpl_->context, 1, &input) == RKNN_SUCC),
+            (rknn_inputs_set(model_.context, 1, &input) == RKNN_SUCC),
             "rknn_inputs_set failed", (std::nullopt));
         
         GRACEFUL_ASSERT(
-            (rknn_run(pimpl_->context, nullptr) == RKNN_SUCC),
+            (rknn_run(model_.context, nullptr) == RKNN_SUCC),
             "rknn_run failed", (std::nullopt));
 
-        rknn_output output{};
-        output.index = 0;
-        output.want_float = 1;
-        output.is_prealloc = 0;
-        
+        std::array<rknn_output, kModelOutputNum> outputs{};
+        for (int i = 0; i < kModelOutputNum; ++i) {
+            outputs[i].index = i;
+            // Match Rockchip's pose example: preserve native INT8/FP16
+            // outputs for a quantized model, otherwise request FP32.
+            outputs[i].want_float = !model_.is_quant;
+            outputs[i].is_prealloc = 0;
+        }
+
         GRACEFUL_ASSERT(
-            (rknn_outputs_get(pimpl_->context, 1, &output, nullptr) == RKNN_SUCC),
+            (rknn_outputs_get(
+                model_.context,
+                kModelOutputNum,
+                outputs.data(),
+                nullptr
+            ) == RKNN_SUCC),
             "rknn_outputs_get failed", (std::nullopt));
 
-        const float* prediction = static_cast<const float*>(output.buf);
-        const int count = pimpl_->output_attr.n_elems / kOutputChannels;
+        object_detect_result_list results{};
+        const int postprocess_result = post_process(
+            &model_,
+            outputs.data(),
+            &prep,
+            BOX_THRESH,
+            NMS_THRESH,
+            &results
+        );
+        const int release_result = rknn_outputs_release(
+            model_.context, kModelOutputNum, outputs.data());
 
-        auto value = [prediction, count](int channel, int index) {
-            return prediction[channel * count + index];
-        };
+        GRACEFUL_ASSERT_EQ(
+            postprocess_result, 0,
+            "pose postprocessing failed", (std::nullopt));
+        GRACEFUL_ASSERT_EQ(
+            release_result, RKNN_SUCC,
+            "rknn_outputs_release failed", (std::nullopt));
 
         std::vector<GateSegmentCandidate> candidates;
-        candidates.reserve(count);
-        for (int i = 0; i < count; ++i) {
-            auto gate_opt = pimpl_->DecodeGate(i, value);
-            if (gate_opt) {
-                candidates.push_back(std::move(*gate_opt));
+        candidates.reserve(results.count);
+        for (int i = 0; i < results.count; ++i) {
+            const auto& result = results.results[i];
+            if (result.cls_id < 0 || result.cls_id >= kClassNum) {
+                continue;
             }
-        }
-        
-        rknn_outputs_release(pimpl_->context, 1, &output);
 
-        FieldObjects fo = pimpl_->ProcessGateCandidates(
-            frame, prep, candidates);
+            const float left_confidence = result.keypoints[0][2];
+            const float right_confidence = result.keypoints[1][2];
+            if (left_confidence < kKeypointThreshold ||
+                right_confidence < kKeypointThreshold) {
+                continue;
+            }
+
+            candidates.push_back(GateSegmentCandidate{
+                result.cls_id,
+                cv::Point2f{
+                    result.keypoints[0][0], result.keypoints[0][1]
+                },
+                cv::Point2f{
+                    result.keypoints[1][0], result.keypoints[1][1]
+                },
+                std::min(
+                    result.prop,
+                    std::min(left_confidence, right_confidence)
+                )
+            });
+        }
+
+        FieldObjects fo = ProcessGateCandidates(
+            frame, candidates, max_one_color_gates_);
         return fo;
     }
 

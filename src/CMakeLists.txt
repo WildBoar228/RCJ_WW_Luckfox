@@ -3,7 +3,9 @@ add_library(
     blob_sender.cpp
     rcj_neurovision.cpp
     rcj_vision.cpp
+
     luckfox_mpi.cc
+    postprocess.cc
 )
 
 if(BUILD_DESKTOP_DEBUG)
