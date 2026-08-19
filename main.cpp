@@ -136,7 +136,8 @@ int main(int argc, char** argv) {
     #endif
 
     ww::vision::FrameFetcher ff;
-    ww::vision::BlobDetector bd;
+    ww::vision::ThresholdBlobDetector bd;
+    ww::vision::GateSegmentDetector gate_detector;
     
     std::vector<ww::vision::ColorThreshold> thresholds = {
         {
@@ -164,6 +165,7 @@ int main(int argc, char** argv) {
                     for (auto& thr : thresholds) {
                         std::cout << thr << "\n";
                     }
+                    std::cout << "Draw blobs: " << ww::vision::vision_cfg.draw_blobs << "\n";
                 }
                 cfg_update_time = clock.now();
             }
@@ -171,6 +173,10 @@ int main(int argc, char** argv) {
 
         ff.Fetch();
         auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
+        auto gates_opt = gate_detector.Detect(ff.GetFrame());
+        // if (!gates_opt) {
+        //     std::cerr << "Can't detect gates\n";
+        // }
 
         #ifdef DESKTOP_DEBUG
         ww::vision::SendBlobs(std::cout, blobs);
@@ -182,6 +188,10 @@ int main(int argc, char** argv) {
 
         if (ww::vision::vision_cfg.draw_blobs) {
             bd.DrawBlobs(ff.GetFrame(), blobs);
+            gate_detector.DrawResult(ff.GetFrame(), ww::vision::FieldObjects{});
+            // if (gates_opt) {
+            //     gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
+            // }
         }
 
         if (ww::vision::vision_cfg.send_stream) {

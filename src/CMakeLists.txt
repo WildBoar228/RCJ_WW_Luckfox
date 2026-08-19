@@ -1,6 +1,7 @@
 add_library(
     rcj_ww_vision_lib
     blob_sender.cpp
+    rcj_neurovision.cpp
     rcj_vision.cpp
     luckfox_mpi.cc
 )

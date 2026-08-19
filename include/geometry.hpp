@@ -35,6 +35,7 @@ namespace vision {
         LineEquation eq_;
 
     public:
+        constexpr Segment() = default;
         constexpr Segment(Point, Point);
         constexpr Segment(Point begin, Deg angle, int length);
         constexpr int PointEquation(Point) const;

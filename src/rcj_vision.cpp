@@ -437,7 +437,7 @@ namespace vision {
     #endif
     
 
-    auto BlobDetector::ReadBlobs(
+    auto ThresholdBlobDetector::ReadBlobs(
         cv::Mat& frame,
         const std::vector<ColorThreshold>& thresholds
     ) -> std::vector<std::vector<BlobGeom>> {
@@ -456,7 +456,7 @@ namespace vision {
         return blobs;
     }
     
-    void BlobDetector::DrawBlob(cv::Mat& result, const BlobGeom& blob, cv::Scalar color) {
+    void ThresholdBlobDetector::DrawBlob(cv::Mat& result, const BlobGeom& blob, cv::Scalar color) {
         std::vector<cv::Point> polygon(blob.vert_cnt);
         for (int i = 0; i < blob.vert_cnt; ++i) {
             polygon[i] = PointToImage(blob.p[i]);
@@ -496,7 +496,7 @@ namespace vision {
         );
     }
 
-    void BlobDetector::DrawBlobs(
+    void ThresholdBlobDetector::DrawBlobs(
         cv::Mat& frame,
         const std::vector<std::vector<BlobGeom>>& blobs) {
 
@@ -516,6 +516,10 @@ namespace vision {
             ++color_idx;
         }
     }
+
+    class GateSegmentDetector::Impl {
+        
+    };
 
 } // namespace vision
 } // namespace ww
