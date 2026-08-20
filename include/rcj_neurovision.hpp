@@ -11,6 +11,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
+#ifndef DESKTOP_DEBUG
 #include "rk_debug.h"
 #include "rk_defines.h"
 #include "rk_mpi_adec.h"
@@ -30,8 +31,8 @@
 #include "rk_mpi_vo.h"
 #include "rk_mpi_vpss.h"
 
-#ifndef DESKTOP_DEBUG
 #include "rknn_api.h"
+#include "yolov8-pose.h"
 #endif
 
 #include "rtsp_demo.h"
@@ -78,28 +79,15 @@ namespace vision {
         float confidence;
     };
 
-    class ModelHandler {
-    public:
-        rknn_context context = 0;
-        rknn_input_output_num io_num{};
-        std::array<rknn_tensor_attr, 1> input_attrs{};
-        std::array<rknn_tensor_attr, kModelOutputNum> output_attrs{};
-        int input_width = 0;
-        int input_height = 0;
-        bool is_quant = false;
-
-        ModelHandler(char* model_path);
-        ~ModelHandler();
-
-        bool ValidateModel();
-    };
-
     class GateSegmentDetector {
-        ModelHandler model_;
+        rknn_app_context_t app_ctx{};
+        image_buffer_t src_image{};
         static constexpr int max_one_color_gates_ = 2;
+        bool is_initialized = false;
 
     public:
         GateSegmentDetector(char* model_path);
+        
         std::optional<FieldObjects> Detect(cv::Mat&);
         static void DrawResult(cv::Mat&, const FieldObjects&);
         ~GateSegmentDetector();

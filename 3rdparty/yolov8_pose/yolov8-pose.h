@@ -21,7 +21,7 @@
 
 
 
-typedef struct {
+struct rknn_app_context_t {
     rknn_context rknn_ctx;
     rknn_input_output_num io_num;
     rknn_tensor_attr* input_attrs;
@@ -30,7 +30,7 @@ typedef struct {
     int model_width;
     int model_height;
     bool is_quant;
-} rknn_app_context_t;
+};
 
 #include "postprocess.h"
 

@@ -5,7 +5,6 @@ add_library(
     rcj_vision.cpp
 
     luckfox_mpi.cc
-    postprocess.cc
 )
 
 if(BUILD_DESKTOP_DEBUG)
@@ -26,7 +25,7 @@ else()
                         yolov8_pose
                         )
 
-    target_include_directories(rcj_ww_vision_lib PRIVATE                        
+    target_include_directories(rcj_ww_vision_lib PUBLIC                        
                                 ${OpenCV_INCLUDE_DIRS}
                                 ${PROJECT_SOURCE_DIR}/include
                                 ${PROJECT_SOURCE_DIR}/3rdparty/yolov8_pose

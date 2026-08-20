@@ -135,11 +135,26 @@ int main(int argc, char** argv) {
 
     const char* runtime_cfg_path = "/userdata/runtime.cfg";
     const char* gate_model_path = "/root/best-int8.rknn";
+
+    YoloConfig& yolo_cfg = yolo_config();
+    yolo_cfg.class_count = ww::vision::kClassNum;
+    yolo_cfg.keypoint_count = ww::vision::kKeypointNum;
+    yolo_cfg.keypoint_dimensions = ww::vision::kKeypointDimensions;
+    yolo_cfg.dfl_bins = ww::vision::kDflBins;
+    yolo_cfg.detection_head_count = ww::vision::kDetectionHeadNum;
+    yolo_cfg.keypoint_output_index = ww::vision::kDetectionHeadNum;
+    yolo_cfg.anchor_count = ww::vision::kTotalAnchors;
+    yolo_cfg.max_results = YoloConfig::result_capacity;
+    yolo_cfg.nms_threshold = 0.4f;
+    yolo_cfg.box_threshold = ww::vision::kDetectionThreshold;
+    yolo_cfg.labels_path.clear();
+
+    ww::vision::GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
+
     #endif
 
     ww::vision::FrameFetcher ff;
     ww::vision::ThresholdBlobDetector bd;
-    ww::vision::GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
     
     std::vector<ww::vision::ColorThreshold> thresholds = {
         {
@@ -175,14 +190,11 @@ int main(int argc, char** argv) {
 
         ff.Fetch();
         auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
-        auto gates_opt = gate_detector.Detect(ff.GetFrame());
-        // if (!gates_opt) {
-        //     std::cerr << "Can't detect gates\n";
-        // }
 
         #ifdef DESKTOP_DEBUG
         ww::vision::SendBlobs(std::cout, blobs);
         #else
+        auto gates_opt = gate_detector.Detect(ff.GetFrame());
         if (uart_err == 0) {
             ww::vision::SendBlobs(uart, blobs);
         }
@@ -190,10 +202,13 @@ int main(int argc, char** argv) {
 
         if (ww::vision::vision_cfg.draw_blobs) {
             bd.DrawBlobs(ff.GetFrame(), blobs);
+
+            #ifndef DESKTOP_DEBUG
             gate_detector.DrawResult(ff.GetFrame(), ww::vision::FieldObjects{});
             // if (gates_opt) {
             //     gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
             // }
+            #endif
         }
 
         if (ww::vision::vision_cfg.send_stream) {

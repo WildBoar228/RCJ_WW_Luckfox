@@ -33,7 +33,7 @@ struct YoloConfig {
 // YOLOv8-pose defaults until changed by the application.
 YoloConfig& yolo_config();
 
-// class rknn_app_context_t;
+struct rknn_app_context_t;
 
 typedef struct {
     image_rect_t box;

@@ -19,7 +19,7 @@
 
 #include "yolov8-pose.h"
 #include "common.h"
-#include "image_utils.h"
+// #include "image_utils.h"
 
 #include <sys/time.h>
 
@@ -49,6 +49,20 @@ int init_yolov8_pose_model(const char *model_path, rknn_app_context_t *app_ctx)
     {
         printf("rknn_init fail! ret=%d\n", ret);
         return -1;
+    }
+
+    rknn_sdk_version version{};
+    ret = rknn_query(
+        ctx,
+        RKNN_QUERY_SDK_VERSION,
+        &version,
+        sizeof(version));
+
+    if (ret == RKNN_SUCC) {
+        printf("RKNN API: %s\n", version.api_version);
+        printf("RKNN driver: %s\n", version.drv_version);
+    } else {
+        printf("FAILED rknn_query: %d\n", ret);
     }
 
     // Get Model Input Output Number

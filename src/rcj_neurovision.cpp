@@ -1,9 +1,10 @@
 #ifndef DESKTOP_DEBUG
 #include "rknn_api.h"
+#include "postprocess.h"
+#include "yolov8-pose.h"
 #endif
 #include "rcj_vision.hpp"
 #include "rcj_neurovision.hpp"
-#include "postprocess.h"
 #include <opencv2/core.hpp>
 
 #include <algorithm>
@@ -82,161 +83,6 @@ if (exp == actual) {                                    \
 
 #ifndef DESKTOP_DEBUG
 
-    ModelHandler::ModelHandler(char* model_path) {
-        RK_LOGI("Initialize model...");
-        GRACEFUL_ASSERT_EQ(
-            (rknn_init(&context, model_path, 0, 0, nullptr)),
-            RKNN_SUCC,
-            "rknn_init", );
-
-        if (!ValidateModel()) {
-            rknn_destroy(context);
-            context = 0;
-            return;
-        }
-    }
-
-    ModelHandler::~ModelHandler() {
-        if (context != 0) {
-            rknn_destroy(context);
-        }
-    }
-
-    bool ModelHandler::ValidateModel() {
-        RK_LOGI("Validate model...");
-
-        GRACEFUL_ASSERT_EQ(
-            (rknn_query(context, RKNN_QUERY_IN_OUT_NUM, &io_num, sizeof(io_num))),
-            RKNN_SUCC,
-            "RKNN_QUERY_IN_OUT_NUM failed", false);
-
-        GRACEFUL_ASSERT_EQ(
-            (io_num.n_input), 1,
-            "wrong io_num.n_input", false);
-
-        GRACEFUL_ASSERT_EQ(
-            (io_num.n_output), kModelOutputNum,
-            "wrong io_num.n_output", false);
-
-        input_attrs[0].index = 0;
-        GRACEFUL_ASSERT_EQ(
-            (rknn_query(
-                context, RKNN_QUERY_INPUT_ATTR,
-                &input_attrs[0], sizeof(input_attrs[0])
-            )),
-            RKNN_SUCC,
-            "RKNN_QUERY_INPUT_ATTR failed", false);
-
-        for (int i = 0; i < kModelOutputNum; ++i) {
-            output_attrs[i].index = i;
-            GRACEFUL_ASSERT_EQ(
-                (rknn_query(
-                    context, RKNN_QUERY_OUTPUT_ATTR,
-                    &output_attrs[i], sizeof(output_attrs[i])
-                )),
-                RKNN_SUCC,
-                "RKNN_QUERY_OUTPUT_ATTR failed", false);
-        }
-
-        const auto& input_attr = input_attrs[0];
-        GRACEFUL_ASSERT_EQ(
-            input_attr.n_dims, 4,
-            "Input must have four dimensions", false);
-        if (input_attr.fmt == RKNN_TENSOR_NCHW) {
-            input_height = input_attr.dims[2];
-            input_width = input_attr.dims[3];
-            GRACEFUL_ASSERT_EQ(
-                input_attr.dims[1], 3,
-                "Wrong model input channels", false);
-        } else {
-            input_height = input_attr.dims[1];
-            input_width = input_attr.dims[2];
-            GRACEFUL_ASSERT_EQ(
-                input_attr.dims[3], 3,
-                "Wrong model input channels", false);
-        }
-
-        GRACEFUL_ASSERT_EQ(
-            input_width, kExpectedWidth,
-            "Wrong model width", false);
-
-        GRACEFUL_ASSERT_EQ(
-            input_height, kExpectedHeight,
-            "Wrong model height", false);
-
-        constexpr std::array<int, kDetectionHeadNum> grid_sizes{40, 20, 10};
-        for (int i = 0; i < kDetectionHeadNum; ++i) {
-            const auto& attr = output_attrs[i];
-            const int grid = grid_sizes[i];
-
-            GRACEFUL_ASSERT_EQ(
-                attr.n_dims, 4,
-                "Detection output must have four dimensions", false);
-            GRACEFUL_ASSERT_EQ(
-                attr.fmt, RKNN_TENSOR_NCHW,
-                "Detection output must use NCHW", false);
-            GRACEFUL_ASSERT_EQ(
-                attr.dims[0], 1,
-                "Wrong detection output batch", false);
-            GRACEFUL_ASSERT_EQ(
-                attr.dims[1], kDetectionOutputChannels,
-                "Wrong detection output channels", false);
-            GRACEFUL_ASSERT_EQ(
-                static_cast<int>(attr.dims[2]), grid,
-                "Wrong detection output height", false);
-            GRACEFUL_ASSERT_EQ(
-                static_cast<int>(attr.dims[3]), grid,
-                "Wrong detection output width", false);
-            GRACEFUL_ASSERT(
-                attr.type == RKNN_TENSOR_INT8 ||
-                attr.type == RKNN_TENSOR_UINT8 ||
-                attr.type == RKNN_TENSOR_FLOAT16 ||
-                attr.type == RKNN_TENSOR_FLOAT32,
-                "Unsupported detection output type", false);
-        }
-
-        const auto& keypoint_attr = output_attrs[3];
-        GRACEFUL_ASSERT_EQ(
-            keypoint_attr.n_dims, 4,
-            "Keypoint output must have four dimensions", false);
-        GRACEFUL_ASSERT_EQ(
-            keypoint_attr.dims[0], 1,
-            "Wrong keypoint output batch", false);
-        GRACEFUL_ASSERT_EQ(
-            keypoint_attr.dims[1], kKeypointNum,
-            "Wrong number of keypoints", false);
-        GRACEFUL_ASSERT_EQ(
-            keypoint_attr.dims[2], kKeypointDimensions,
-            "Wrong keypoint dimensions", false);
-        GRACEFUL_ASSERT_EQ(
-            keypoint_attr.dims[3], kTotalAnchors,
-            "Wrong keypoint anchor count", false);
-        GRACEFUL_ASSERT(
-            keypoint_attr.type == RKNN_TENSOR_INT8 ||
-            keypoint_attr.type == RKNN_TENSOR_UINT8 ||
-            keypoint_attr.type == RKNN_TENSOR_FLOAT16 ||
-            keypoint_attr.type == RKNN_TENSOR_FLOAT32,
-            "Unsupported keypoint output type", false);
-
-        is_quant =
-            output_attrs[0].qnt_type == RKNN_TENSOR_QNT_AFFINE_ASYMMETRIC &&
-            (output_attrs[0].type == RKNN_TENSOR_INT8 ||
-             output_attrs[0].type == RKNN_TENSOR_UINT8);
-
-        for (int i = 1; i < kDetectionHeadNum; ++i) {
-            const bool output_is_quant =
-                output_attrs[i].qnt_type == RKNN_TENSOR_QNT_AFFINE_ASYMMETRIC &&
-                (output_attrs[i].type == RKNN_TENSOR_INT8 ||
-                 output_attrs[i].type == RKNN_TENSOR_UINT8);
-            GRACEFUL_ASSERT_EQ(
-                output_is_quant, is_quant,
-                "Detection heads use inconsistent quantization", false);
-        }
-
-        RK_LOGI("Model is correct!");
-        return true;
-    }
-
     FieldObjects ProcessGateCandidates(
         const cv::Mat& frame,
         std::vector<GateSegmentCandidate>& candidates,
@@ -281,83 +127,49 @@ if (exp == actual) {                                    \
         return fo;
     }
 
-    GateSegmentDetector::GateSegmentDetector(char* model_path)
-        : model_(model_path) {}
+    GateSegmentDetector::GateSegmentDetector(
+        char* model_path)
+        : is_initialized(false) {
+        RK_LOGI("Initialize model...");
+
+        GRACEFUL_ASSERT_EQ(
+            (init_yolov8_pose_model(model_path, &app_ctx)),
+            0,
+            "init_yolov8_pose_model", );
+
+        is_initialized = true;
+    }
 
     auto GateSegmentDetector::Detect(cv::Mat& frame)
         -> std::optional<FieldObjects> {
-            
-        GRACEFUL_ASSERT_NEQ(
-            (model_.context),
-            0,
-            "rknn hasn't initialized", (std::nullopt));
-        GRACEFUL_ASSERT(
-            !frame.empty(),
-            "input frame is empty", (std::nullopt));
 
-        auto prep = Letterbox(
-            frame, model_.input_width, model_.input_height
-        );
-
-        rknn_input input{};
-        input.index = 0;
-        input.buf = prep.rgb.data;
-        input.size = static_cast<uint32_t>(
-            prep.rgb.total() * prep.rgb.elemSize()
-        );
-        input.type = RKNN_TENSOR_UINT8;
-        input.fmt = RKNN_TENSOR_NHWC;
-        input.pass_through = 0;
-
-        GRACEFUL_ASSERT(
-            (rknn_inputs_set(model_.context, 1, &input) == RKNN_SUCC),
-            "rknn_inputs_set failed", (std::nullopt));
-        
-        GRACEFUL_ASSERT(
-            (rknn_run(model_.context, nullptr) == RKNN_SUCC),
-            "rknn_run failed", (std::nullopt));
-
-        std::array<rknn_output, kModelOutputNum> outputs{};
-        for (int i = 0; i < kModelOutputNum; ++i) {
-            outputs[i].index = i;
-            // Match Rockchip's pose example: preserve native INT8/FP16
-            // outputs for a quantized model, otherwise request FP32.
-            outputs[i].want_float = !model_.is_quant;
-            outputs[i].is_prealloc = 0;
+        if (!is_initialized) {
+            RK_LOGE("GateSegmentDetector isn't initialized!");
+            return std::nullopt;
         }
 
-        GRACEFUL_ASSERT(
-            (rknn_outputs_get(
-                model_.context,
-                kModelOutputNum,
-                outputs.data(),
-                nullptr
-            ) == RKNN_SUCC),
-            "rknn_outputs_get failed", (std::nullopt));
+        object_detect_result_list od_results;
 
-        object_detect_result_list results{};
-        const int postprocess_result = post_process(
-            &model_,
-            outputs.data(),
-            &prep,
-            BOX_THRESH,
-            NMS_THRESH,
-            &results
-        );
-        const int release_result = rknn_outputs_release(
-            model_.context, kModelOutputNum, outputs.data());
+        cv::Mat rgb;
+        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        src_image = {};
+        src_image.width = rgb.cols;
+        src_image.height = rgb.rows;
+        src_image.format = IMAGE_FORMAT_RGB888;
+        src_image.virt_addr = rgb.data;
+        src_image.size = static_cast<int>(rgb.total() * rgb.elemSize());
+        src_image.fd = -1;
 
-        GRACEFUL_ASSERT_EQ(
-            postprocess_result, 0,
-            "pose postprocessing failed", (std::nullopt));
-        GRACEFUL_ASSERT_EQ(
-            release_result, RKNN_SUCC,
-            "rknn_outputs_release failed", (std::nullopt));
+        int ret = inference_yolov8_pose_model(&app_ctx, &src_image, &od_results);
+        if (ret != 0) {
+            RK_LOGE("inference_yolov8_pose_model failed: %d", ret);
+            return std::nullopt;
+        }
 
         std::vector<GateSegmentCandidate> candidates;
-        candidates.reserve(results.count);
-        for (int i = 0; i < results.count; ++i) {
-            const auto& result = results.results[i];
+        candidates.reserve(od_results.count);
+        for (int i = 0; i < od_results.count; ++i) {
+            const object_detect_result& result = od_results.results[i];
             if (result.cls_id < 0 || result.cls_id >= kClassNum) {
                 continue;
             }
@@ -408,7 +220,10 @@ if (exp == actual) {                                    \
         }
     }
 
-    GateSegmentDetector::~GateSegmentDetector() = default;
+    GateSegmentDetector::~GateSegmentDetector() {
+        release_yolov8_pose_model(&app_ctx);
+        is_initialized = false;
+    }
 #else
 #endif
 
