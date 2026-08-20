@@ -26,6 +26,7 @@ struct YoloConfig {
     int max_results = result_capacity;
     float nms_threshold = 0.4f;
     float box_threshold = 0.5f;
+    bool debug_output = false;
     std::string labels_path = "./model/yolov8_pose_labels_list.txt";
 };
 

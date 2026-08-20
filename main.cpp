@@ -147,6 +147,7 @@ int main(int argc, char** argv) {
     yolo_cfg.max_results = YoloConfig::result_capacity;
     yolo_cfg.nms_threshold = 0.4f;
     yolo_cfg.box_threshold = ww::vision::kDetectionThreshold;
+    yolo_cfg.debug_output = false;
     yolo_cfg.labels_path.clear();
 
     ww::vision::GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
@@ -189,25 +190,28 @@ int main(int argc, char** argv) {
         }
 
         ff.Fetch();
-        auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
+        // auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
 
         #ifdef DESKTOP_DEBUG
         ww::vision::SendBlobs(std::cout, blobs);
         #else
-        auto gates_opt = gate_detector.Detect(ff.GetFrame());
+        auto gates_opt = gate_detector.Detect(
+            ff.GetFrame(),
+            ff.GetFrameFd()
+        );
         if (uart_err == 0) {
-            ww::vision::SendBlobs(uart, blobs);
+            // ww::vision::SendBlobs(uart, blobs);
         }
         #endif
 
         if (ww::vision::vision_cfg.draw_blobs) {
-            bd.DrawBlobs(ff.GetFrame(), blobs);
+            // bd.DrawBlobs(ff.GetFrame(), blobs);
 
             #ifndef DESKTOP_DEBUG
-            gate_detector.DrawResult(ff.GetFrame(), ww::vision::FieldObjects{});
-            // if (gates_opt) {
-            //     gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
-            // }
+            // gate_detector.DrawResult(ff.GetFrame(), ww::vision::FieldObjects{});
+            if (gates_opt) {
+                gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
+            }
             #endif
         }
 

@@ -57,15 +57,8 @@ namespace vision {
     static constexpr int kTotalAnchors =
         40 * 40 + 20 * 20 + 10 * 10;
 
-    static constexpr float kDetectionThreshold = 0.5f;
-    static constexpr float kKeypointThreshold = 0.25f;
-
-    struct LetterboxResult {
-        cv::Mat rgb;
-        float scale;
-        int pad_x;
-        int pad_y;
-    };
+    static constexpr float kDetectionThreshold = 0.05; //0.5f;
+    static constexpr float kKeypointThreshold = 0.05; //0.25f;
 
     struct FieldObjects {
         std::vector<Segment> yellow_gates;
@@ -88,7 +81,7 @@ namespace vision {
     public:
         GateSegmentDetector(char* model_path);
         
-        std::optional<FieldObjects> Detect(cv::Mat&);
+        std::optional<FieldObjects> Detect(cv::Mat&, int dma_fd);
         static void DrawResult(cv::Mat&, const FieldObjects&);
         ~GateSegmentDetector();
     };

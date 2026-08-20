@@ -17,42 +17,6 @@ namespace vision {
 
 namespace {
 
-    LetterboxResult Letterbox(const cv::Mat& frame, int width, int height) {
-        float scale = std::min(
-            static_cast<float>(width) / frame.cols,
-            static_cast<float>(height) / frame.rows
-        );
-
-        int resized_width =
-            static_cast<int>(std::round(frame.cols * scale));
-        int resized_height =
-            static_cast<int>(std::round(frame.rows * scale));
-
-        int pad_x = (width - resized_width) / 2;
-        int pad_y = (height - resized_height) / 2;
-
-        cv::Mat input(
-            height, width, CV_8UC3,
-            cv::Scalar(114, 114, 114)
-        );
-
-        cv::Mat resized;
-        cv::resize(
-            frame, resized,
-            cv::Size(resized_width, resized_height),
-            0, 0, cv::INTER_LINEAR
-        );
-
-        resized.copyTo(input(
-            cv::Rect(pad_x, pad_y, resized_width, resized_height)
-        ));
-
-        cv::Mat rgb;
-        cv::cvtColor(input, rgb, cv::COLOR_BGR2RGB);
-
-        return {std::move(rgb), scale, pad_x, pad_y};
-    }
-
     ww::vision::Point PointFromDetection(
         const cv::Mat& frame,
         cv::Point2f point) {
@@ -112,6 +76,9 @@ if (exp == actual) {                                    \
             static_cast<int>(candidates.end() - middle),
             max_one_color_gates);
 
+        std::cout << "yellow cnt:  " << (last_yellow - candidates.begin()) << "\n";
+        std::cout << "blue cnt:  " << (last_blue - middle) << "\n";
+
         for (auto iter = candidates.begin(); iter != last_yellow; ++iter) {
             fo.yellow_gates.emplace_back(Segment(
                 PointFromDetection(frame, iter->left),
@@ -127,8 +94,7 @@ if (exp == actual) {                                    \
         return fo;
     }
 
-    GateSegmentDetector::GateSegmentDetector(
-        char* model_path)
+    GateSegmentDetector::GateSegmentDetector(char* model_path)
         : is_initialized(false) {
         RK_LOGI("Initialize model...");
 
@@ -140,8 +106,10 @@ if (exp == actual) {                                    \
         is_initialized = true;
     }
 
-    auto GateSegmentDetector::Detect(cv::Mat& frame)
+    auto GateSegmentDetector::Detect(cv::Mat& frame, int dma_fd)
         -> std::optional<FieldObjects> {
+
+        RK_LOGI("Detect...\n");
 
         if (!is_initialized) {
             RK_LOGE("GateSegmentDetector isn't initialized!");
@@ -150,14 +118,14 @@ if (exp == actual) {                                    \
 
         object_detect_result_list od_results;
 
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        // cv::Mat rgb;
+        // cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
         src_image = {};
-        src_image.width = rgb.cols;
-        src_image.height = rgb.rows;
+        src_image.width = frame.cols;
+        src_image.height = frame.rows;
         src_image.format = IMAGE_FORMAT_RGB888;
-        src_image.virt_addr = rgb.data;
-        src_image.size = static_cast<int>(rgb.total() * rgb.elemSize());
+        src_image.virt_addr = frame.data;
+        src_image.size = static_cast<int>(frame.step * frame.rows);
         src_image.fd = -1;
 
         int ret = inference_yolov8_pose_model(&app_ctx, &src_image, &od_results);
@@ -166,11 +134,14 @@ if (exp == actual) {                                    \
             return std::nullopt;
         }
 
+        RK_LOGI("Inference done\n");
+
         std::vector<GateSegmentCandidate> candidates;
         candidates.reserve(od_results.count);
         for (int i = 0; i < od_results.count; ++i) {
             const object_detect_result& result = od_results.results[i];
             if (result.cls_id < 0 || result.cls_id >= kClassNum) {
+                RK_LOGW("reject1:  class %d", result.cls_id);
                 continue;
             }
 
@@ -178,8 +149,12 @@ if (exp == actual) {                                    \
             const float right_confidence = result.keypoints[1][2];
             if (left_confidence < kKeypointThreshold ||
                 right_confidence < kKeypointThreshold) {
+                RK_LOGW("reject2 (confidence):  left %f, right %f, threshold %f",
+                    left_confidence, right_confidence, kKeypointThreshold);
                 continue;
             }
+
+            RK_LOGW("detect class %d", result.cls_id);
 
             candidates.push_back(GateSegmentCandidate{
                 result.cls_id,
@@ -198,11 +173,25 @@ if (exp == actual) {                                    \
 
         FieldObjects fo = ProcessGateCandidates(
             frame, candidates, max_one_color_gates_);
+
+        std::cout << "yellow cnt:  " << fo.yellow_gates.size() << "\n";
+        std::cout << "blue cnt:  " << fo.blue_gates.size() << "\n";
+
+        RK_LOGI("Detecting ended\n");
         return fo;
     }
 
     void GateSegmentDetector::DrawResult(cv::Mat& frame, const FieldObjects& field) {
+        std::cout << "yellow cnt:  " << field.yellow_gates.size() << "\n";
+        std::cout << "blue cnt:  " << field.blue_gates.size() << "\n";
+
         for (const Segment& ygate : field.yellow_gates) {
+            RK_LOGW("yellow gate: (%f;%f) (%f;%f)",
+                PointToImage(ygate.Begin()).x,
+                PointToImage(ygate.Begin()).y,
+                PointToImage(ygate.End()).x,
+                PointToImage(ygate.End()).y
+            );
             cv::line(
                 frame,
                 PointToImage(ygate.Begin()),
@@ -211,6 +200,12 @@ if (exp == actual) {                                    \
             );
         }
         for (const Segment& bgate : field.blue_gates) {
+            RK_LOGW("blue gate: (%f;%f) (%f;%f)",
+                PointToImage(bgate.Begin()).x,
+                PointToImage(bgate.Begin()).y,
+                PointToImage(bgate.End()).x,
+                PointToImage(bgate.End()).y
+            );
             cv::line(
                 frame,
                 PointToImage(bgate.Begin()),

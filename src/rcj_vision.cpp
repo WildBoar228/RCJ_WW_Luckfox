@@ -275,6 +275,16 @@ namespace vision {
 
         // Get MB from Pool 
         src_Blk = RK_MPI_MB_GetMB(src_Pool, width * height * 3, RK_TRUE);
+        if (src_Blk == RK_NULL) {
+            RK_LOGE("RK_MPI_MB_GetMB failed");
+            std::exit(-1);
+        }
+
+        src_fd = RK_MPI_MB_Handle2Fd(src_Blk);
+        if (src_fd < 0) {
+            RK_LOGE("RK_MPI_MB_Handle2Fd failed: %d", src_fd);
+            std::exit(-1);
+        }
 
         // Build h264_frame
         h264_frame.stVFrame.u32Width = width;
@@ -357,13 +367,15 @@ namespace vision {
 		} else {
 			RK_LOGE("RK_MPI_VI_GetChnFrame fail %x", s32Ret);
 		}
-		memcpy(data, frame.data, width * height * 3);
+		// memcpy(data, frame.data, width * height * 3);
 
 		// release frame 
 		s32Ret = RK_MPI_VI_ReleaseChnFrame(0, 0, &stViFrame);
 		if (s32Ret != RK_SUCCESS) {
 			RK_LOGE("RK_MPI_VI_ReleaseChnFrame fail %x", s32Ret);
 		}
+        
+        RK_MPI_SYS_MmzFlushCache(src_Blk, RK_FALSE);
     }
 
     void FrameFetcher::SendStream() {

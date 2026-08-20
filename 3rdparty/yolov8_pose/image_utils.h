@@ -17,6 +17,9 @@ typedef struct {
     float scale;
 } letterbox_t;
 
+/** Enable or disable informational output from image conversion helpers. */
+void set_image_utils_debug(int enabled);
+
 /**
  * @brief Convert image for resize and pixel format change
  * 

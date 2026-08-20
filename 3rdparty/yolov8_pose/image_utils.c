@@ -2,13 +2,29 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <math.h>
+#include <string.h>
 #include <sys/time.h>
 
+#include "common.h"
 #include "im2d.h"
 #include "drmrga.h"
 
 #include "image_utils.h"
 // #include "file_utils.h"
+
+static int image_utils_debug_output = 0;
+
+#define IMAGE_UTILS_DEBUG_PRINT(...)                   \
+    do {                                               \
+        if (image_utils_debug_output) {                \
+            printf(__VA_ARGS__);                       \
+        }                                              \
+    } while (0)
+
+void set_image_utils_debug(int enabled)
+{
+    image_utils_debug_output = enabled != 0;
+}
 
 static const char* filter_image_names[] = {
     "jpg",
@@ -121,7 +137,11 @@ static int convert_image_cpu(image_buffer_t *src, image_buffer_t *dst, image_rec
         return -1;
     }
     if (src->format != dst->format) {
-        return -1;
+        if (src->format == IMAGE_FORMAT_BGR888 && dst->format == IMAGE_FORMAT_RGB888) {
+            // ok
+        } else {
+            return -1;
+        }
     }
 
     int src_box_x = 0;
@@ -180,7 +200,7 @@ static int convert_image_cpu(image_buffer_t *src, image_buffer_t *dst, image_rec
         printf("convert_image_cpu fail %d\n", reti);
         return -1;
     }
-    printf("finish\n");
+    IMAGE_UTILS_DEBUG_PRINT("finish\n");
     return 0;
 }
 
@@ -189,6 +209,8 @@ static int get_rga_fmt(image_format_t fmt) {
     {
     case IMAGE_FORMAT_RGB888:
         return RK_FORMAT_RGB_888;
+    case IMAGE_FORMAT_BGR888:
+        return RK_FORMAT_BGR_888;
     case IMAGE_FORMAT_RGBA8888:
         return RK_FORMAT_RGBA_8888;
     case IMAGE_FORMAT_YUV420SP_NV12:
@@ -210,6 +232,7 @@ int get_image_size(image_buffer_t* image)
     case IMAGE_FORMAT_GRAY8:
         return image->width * image->height;
     case IMAGE_FORMAT_RGB888:
+    case IMAGE_FORMAT_BGR888:
         return image->width * image->height * 3;    
     case IMAGE_FORMAT_RGBA8888:
         return image->width * image->height * 4;
@@ -309,7 +332,7 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
     if (use_handle) {
         if (src_phy != NULL) {
             rga_handle_src = importbuffer_physicaladdr((uint64_t)src_phy, &in_param);
-        } else if (src_fd > 0) {
+        } else if (src_fd >= 0) {
             rga_handle_src = importbuffer_fd(src_fd, &in_param);
         } else {
             rga_handle_src = importbuffer_virtualaddr(src, &in_param);
@@ -323,7 +346,7 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
     } else {
         if (src_phy != NULL) {
             rga_buf_src = wrapbuffer_physicaladdr(src_phy, srcWidth, srcHeight, srcFmt, srcWidth, srcHeight);
-        } else if (src_fd > 0) {
+        } else if (src_fd >= 0) {
             rga_buf_src = wrapbuffer_fd(src_fd, srcWidth, srcHeight, srcFmt, srcWidth, srcHeight);
         } else {
             rga_buf_src = wrapbuffer_virtualaddr(src, srcWidth, srcHeight, srcFmt, srcWidth, srcHeight);
@@ -333,7 +356,7 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
     if (use_handle) {
         if (dst_phy != NULL) {
             rga_handle_dst = importbuffer_physicaladdr((uint64_t)dst_phy, &dst_param);
-        } else if (dst_fd > 0) {
+        } else if (dst_fd >= 0) {
             rga_handle_dst = importbuffer_fd(dst_fd, &dst_param);
         } else {
             rga_handle_dst = importbuffer_virtualaddr(dst, &dst_param);
@@ -347,7 +370,7 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
     } else {
         if (dst_phy != NULL) {
             rga_buf_dst = wrapbuffer_physicaladdr(dst_phy, dstWidth, dstHeight, dstFmt, dstWidth, dstHeight);
-        } else if (dst_fd > 0) {
+        } else if (dst_fd >= 0) {
             rga_buf_dst = wrapbuffer_fd(dst_fd, dstWidth, dstHeight, dstFmt, dstWidth, dstHeight);
         } else {
             rga_buf_dst = wrapbuffer_virtualaddr(dst, dstWidth, dstHeight, dstFmt, dstWidth, dstHeight);
@@ -362,14 +385,15 @@ static int convert_image_rga(image_buffer_t* src_img, image_buffer_t* dst_img, i
         p_imcolor[1] = color;
         p_imcolor[2] = color;
         p_imcolor[3] = color;
-        printf("fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
+        IMAGE_UTILS_DEBUG_PRINT(
+            "fill dst image (x y w h)=(%d %d %d %d) with color=0x%x\n",
             dst_whole_rect.x, dst_whole_rect.y, dst_whole_rect.width, dst_whole_rect.height, imcolor);
-        ret_rga = imfill(rga_buf_dst, dst_whole_rect, imcolor);
-        if (ret_rga <= 0) {
-            if (dst != NULL) {
-                size_t dst_size = get_image_size(dst_img);
-                memset(dst, color, dst_size);
-            } else {
+        if (dst != NULL) {
+            size_t dst_size = get_image_size(dst_img);
+            memset(dst, color, dst_size);
+        } else {
+            ret_rga = imfill(rga_buf_dst, dst_whole_rect, imcolor);
+            if (ret_rga <= 0) {
                 printf("Warning: Can not fill color on target image\n");
             }
         }
@@ -400,7 +424,7 @@ int convert_image(image_buffer_t* src_img, image_buffer_t* dst_img, image_rect_t
 {
     int ret;
 #if defined(DISABLE_RGA) 
-    printf("convert image use cpu\n");
+    IMAGE_UTILS_DEBUG_PRINT("convert image use cpu\n");
     ret = convert_image_cpu(src_img, dst_img, src_box, dst_box, color);
 #else
 
@@ -411,11 +435,12 @@ int convert_image(image_buffer_t* src_img, image_buffer_t* dst_img, image_rect_t
 #endif
         ret = convert_image_rga(src_img, dst_img, src_box, dst_box, color);
         if (ret != 0) {
-            printf("try convert image use cpu\n");
+            IMAGE_UTILS_DEBUG_PRINT("try convert image use cpu: %d\n", ret);
             ret = convert_image_cpu(src_img, dst_img, src_box, dst_box, color);
         }
     } else {
-        printf("src width is not 4/16-aligned, convert image use cpu\n");
+        IMAGE_UTILS_DEBUG_PRINT(
+            "src width is not 4/16-aligned, convert image use cpu\n");
         ret = convert_image_cpu(src_img, dst_img, src_box, dst_box, color);
     }
 #endif
@@ -493,9 +518,10 @@ int convert_image_with_letterbox(image_buffer_t* src_image, image_buffer_t* dst_
         dst_box.right = dst_box.left + resize_w - 1;
         _left_offset = dst_box.left;
     }
-    printf("scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
-        scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom, allow_slight_change,
-        _left_offset, _top_offset, padding_w, padding_h);
+    IMAGE_UTILS_DEBUG_PRINT(
+        "scale=%f dst_box=(%d %d %d %d) allow_slight_change=%d _left_offset=%d _top_offset=%d padding_w=%d padding_h=%d\n",
+        scale, dst_box.left, dst_box.top, dst_box.right, dst_box.bottom,
+        allow_slight_change, _left_offset, _top_offset, padding_w, padding_h);
 
     //set offset and scale
     if(letterbox != NULL){

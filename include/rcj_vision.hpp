@@ -159,6 +159,7 @@ namespace vision {
         MB_POOL src_Pool;
 
         MB_BLK src_Blk;
+        int src_fd = -1;
 
         unsigned char* data;
 
@@ -175,7 +176,15 @@ namespace vision {
         FrameFetcher();
 
         void Fetch();
-        cv::Mat& GetFrame() { return frame; }
+        
+        cv::Mat& GetFrame() {
+            return frame;
+        }
+
+        int GetFrameFd() {
+            return src_fd;
+        }
+
         void SendStream();
 
         ~FrameFetcher();
