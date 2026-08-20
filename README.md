@@ -31,3 +31,29 @@
 `cmake --build build --target rcj_vision_tests --parallel`
 
 `build/tests/rcj_vision_tests`
+
+## Параметры бинарника
+
+- `--stream`/`--no-stream`: добавить/убрать rtsp-стрим (по умолчанию true). В "боевом" режиме лучше отключить для максимальной производительности
+- `--draw-blobs`/`--no-draw-blobs`: отрисовывать объекты на изображении после детекции (по умолчанию true). Регулируется в рантайме, можно менять через UI в [UniKostyl](https://github.com/WildBoar228/UniKostyl)
+- `--runtime-cfg`/`--no-runtime-cfg`: обновлять настройки из файла в рантайме (по умолчанию true), см. далее
+- `--detect-mode=<mode>`: режим детектора, доступно 2:
+  - `thr-blobs` (по умолчанию): поиск блобов по цветовым диапазонам
+  - `yolo-pose`: модель yolo11n-pose, предсказывает ворота с 2 ключевыми точками (левый/правый угол). В режиме DESKTOP_DEBUG на данный момент ничего не делает
+
+## Изменение настроек в рантайме
+
+Запустите на Luckfox [server.py](https://github.com/WildBoar228/RCJ_WW_Luckfox/blob/main/py-server/server.py). По адресу `172.32.0.93:8000` поднимется HTTP-сервер, принимающий JSON-запросы на изменение настроек. JSON должен содержать следующие поля (все обязательные):
+
+```json
+{
+    "draw_blobs": true,
+    "thresholds": [0, 100, -128, 127, -128, 127]
+}
+```
+
+## Автостарт
+
+Поместите скрипт [S99_rcj_ww.sh](https://github.com/WildBoar228/RCJ_WW_Luckfox/blob/main/S99_rcj_ww.sh) в директорию `/etc/init.d/` на Luckfox. В скрипте можно менять параметры запуска.
+
+Для отладки: вывод скрипта перенаправлен в `/var/log/rcj_init.log`, вывод бинарника - в `/var/log/rcj_ww_vision.log`
