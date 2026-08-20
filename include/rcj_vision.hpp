@@ -181,9 +181,11 @@ namespace vision {
             return frame;
         }
 
+        #ifndef DESKTOP_DEBUG
         int GetFrameFd() {
             return src_fd;
         }
+        #endif
 
         void SendStream();
 

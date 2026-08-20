@@ -33,10 +33,10 @@
 
 #include "rknn_api.h"
 #include "yolov8-pose.h"
-#endif
-
 #include "rtsp_demo.h"
 #include "sample_comm.h"
+#endif
+
 
 #include "geometry.hpp"
 
@@ -73,8 +73,10 @@ namespace vision {
     };
 
     class GateSegmentDetector {
+        #ifndef DESKTOP_DEBUG
         rknn_app_context_t app_ctx{};
         image_buffer_t src_image{};
+        #endif
         static constexpr int max_one_color_gates_ = 2;
         bool is_initialized = false;
 

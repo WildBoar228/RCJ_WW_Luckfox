@@ -193,7 +193,7 @@ int main(int argc, char** argv) {
         // auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
 
         #ifdef DESKTOP_DEBUG
-        ww::vision::SendBlobs(std::cout, blobs);
+        // ww::vision::SendBlobs(std::cout, blobs);
         #else
         auto gates_opt = gate_detector.Detect(
             ff.GetFrame(),
