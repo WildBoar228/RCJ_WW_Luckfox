@@ -1,6 +1,6 @@
 # RCJ_WW_Luckfox
 
-Программное обеспечение для камеры Luckfox Pico Pro/Max, разработанное командой White Wings для соревнований в категории RCJ Soccer Lightweight. Написано с поддержкой C++17, используется [opencv-mobile](https://github.com/nihui/opencv-mobile).
+Программное обеспечение для камеры Luckfox Pico Pro/Max, разработанное командой White Wings для соревнований в категории RCJ Soccer Lightweight. Написано с поддержкой C++17, используется [opencv-mobile](https://github.com/nihui/opencv-mobile) и [примеры Rockchip](https://github.com/LuckfoxTECH/luckfox_pico_rkmpi_example) ([и ещё](https://github.com/airockchip/rknn_model_zoo)).
 
 ## Сборка для отладки на десктопе
 
