@@ -52,7 +52,7 @@ int SetupUart(const char* serial_port) {
 #endif
 
 
-bool GetParameter(int argc, char** argv, const char* name, bool default_value = false) {
+bool GetArgvFlag(int argc, char** argv, const char* name, bool default_value = false) {
     bool value = default_value;
     for (int i = 1; i < argc; ++i) {
         if (strncmp(argv[i], "--no-", sizeof("--no-") - 1) == 0) {
@@ -62,6 +62,28 @@ bool GetParameter(int argc, char** argv, const char* name, bool default_value = 
         } else if (strncmp(argv[i], "--", sizeof("--") - 1) == 0) {
             if (strcmp(argv[i] + sizeof("--") - 1, name) == 0) {
                 value = true;
+            }
+        }
+    }
+    return value;
+}
+
+const char* GetArgvString(
+    int argc, char** argv, const char* name, const char* default_value) {
+    const char* value = default_value;
+    char* param;
+    int param_name_len = strlen(name);
+    for (int i = 1; i < argc; ++i) {
+        param = argv[i];
+        if (param[0] == '-' && param[1] == '-') {
+            param += 2;
+            if (strncmp(param, name, param_name_len) == 0) {
+                param += param_name_len;
+                if (*param == '\0') {
+                    value = default_value;
+                } else {
+                    value = param + 1;
+                }
             }
         }
     }
@@ -112,12 +134,29 @@ std::optional<RuntimeCfg> ReadRuntimeCfg(const char* src_name) {
 
 
 int main(int argc, char** argv) {
-    ww::vision::vision_cfg.send_stream = GetParameter(argc, argv, "stream", true);
-    ww::vision::vision_cfg.draw_blobs = GetParameter(argc, argv, "draw-blobs", true);
-    bool update_runtime_cfg = GetParameter(argc, argv, "runtime-cfg", true);
+    using namespace ww::vision;
+    vision_cfg.send_stream = GetArgvFlag(argc, argv, "stream", true);
+    vision_cfg.draw_blobs = GetArgvFlag(argc, argv, "draw-blobs", true);
+    bool update_runtime_cfg = GetArgvFlag(argc, argv, "runtime-cfg", true);
+    const char* detect_mode = GetArgvString(argc, argv, "detect-mode", "thr-blobs");
 
-    printf("send_stream: %d\n", ww::vision::vision_cfg.send_stream);
-    printf("draw_blobs: %d\n", ww::vision::vision_cfg.draw_blobs);
+    printf("send_stream: %d\n", vision_cfg.send_stream);
+    printf("draw_blobs: %d\n", vision_cfg.draw_blobs);
+    printf("detect_mode: %s\n", detect_mode);
+
+    if (strcmp(detect_mode, "thr-blobs") == 0) {
+        vision_cfg.detect_mode = DetectMode::kThresholdBlobs;
+    } else if (strcmp(detect_mode, "yolo-pose") == 0) {
+        #ifdef DESKTOP_DEBUG
+        printf("WARNING: yolo-pose mode doesn't detect anything on DESKTOP_DEBUG\n");
+        #endif
+        vision_cfg.detect_mode = DetectMode::kYoloSegments;
+    } else {
+        printf("WARNING: Unknown detect mode \"%s\", available: thr-blobs, yolo-pose\n",
+            detect_mode);
+        printf("Set thr-blobs as default\n\n");
+        vision_cfg.detect_mode = DetectMode::kThresholdBlobs;
+    }
 
     #ifdef DESKTOP_DEBUG
     std::cout << "BUILD_DESKTOP_DEBUG\n";
@@ -150,17 +189,17 @@ int main(int argc, char** argv) {
     yolo_cfg.debug_output = false;
     yolo_cfg.labels_path.clear();
 
-    ww::vision::GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
+    GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
 
     #endif
 
-    ww::vision::FrameFetcher ff;
-    ww::vision::ThresholdBlobDetector bd;
+    FrameFetcher ff;
+    ThresholdBlobDetector bd;
     
-    std::vector<ww::vision::ColorThreshold> thresholds = {
+    std::vector<ColorThreshold> thresholds = {
         {
-            ww::vision::ColorLab(100, 140, 140),
-            ww::vision::ColorLab(150, 200, 200)
+            ColorLab(100, 140, 140),
+            ColorLab(150, 200, 200)
         }
     };
 
@@ -176,46 +215,51 @@ int main(int argc, char** argv) {
                 if (!cfg_opt) {
                     std::cout << "WARNING: failed to update config\n";
                 } else {
-                    ww::vision::vision_cfg.draw_blobs = cfg_opt->draw_blobs;
+                    vision_cfg.draw_blobs = cfg_opt->draw_blobs;
                     thresholds = cfg_opt->thresholds;
                     
                     std::cout << "Thresholds updated:\n";
                     for (auto& thr : thresholds) {
                         std::cout << thr << "\n";
                     }
-                    std::cout << "Draw blobs: " << ww::vision::vision_cfg.draw_blobs << "\n";
+                    std::cout << "Draw blobs: " << vision_cfg.draw_blobs << "\n";
                 }
                 cfg_update_time = clock.now();
             }
         }
 
         ff.Fetch();
-        // auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
 
-        #ifdef DESKTOP_DEBUG
-        // ww::vision::SendBlobs(std::cout, blobs);
-        #else
-        auto gates_opt = gate_detector.Detect(
-            ff.GetFrame(),
-            ff.GetFrameFd()
-        );
-        if (uart_err == 0) {
-            // ww::vision::SendBlobs(uart, blobs);
-        }
-        #endif
+        if (vision_cfg.detect_mode == DetectMode::kThresholdBlobs) {
+            auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
+            
+            #ifdef DESKTOP_DEBUG
+            SendBlobs(std::cout, blobs);
+            #else
+            if (uart_err == 0) {
+                SendBlobs(uart, blobs);
+            }
+            #endif
 
-        if (ww::vision::vision_cfg.draw_blobs) {
-            // bd.DrawBlobs(ff.GetFrame(), blobs);
-
+            if (vision_cfg.draw_blobs) {
+                bd.DrawBlobs(ff.GetFrame(), blobs);
+            }
+        } else if (vision_cfg.detect_mode == DetectMode::kYoloSegments) {
             #ifndef DESKTOP_DEBUG
-            // gate_detector.DrawResult(ff.GetFrame(), ww::vision::FieldObjects{});
-            if (gates_opt) {
-                gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
+            auto gates_opt = gate_detector.Detect(
+                ff.GetFrame(),
+                ff.GetFrameFd()
+            );
+
+            if (vision_cfg.draw_blobs) {
+                if (gates_opt) {
+                    gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
+                }
             }
             #endif
         }
 
-        if (ww::vision::vision_cfg.send_stream) {
+        if (vision_cfg.send_stream) {
             ff.SendStream();
         }
     }

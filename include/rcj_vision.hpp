@@ -88,6 +88,11 @@ namespace vision {
         int16_t height = 0;
     };
 
+    enum class DetectMode {
+        kThresholdBlobs,
+        kYoloSegments
+    };
+
     struct VisionConfig {
         int frame_width = 640;
         int frame_height = 480;
@@ -99,6 +104,7 @@ namespace vision {
             cv::Scalar(0, 150, 150),
             cv::Scalar(200, 0, 0)
         };
+        DetectMode detect_mode;
     };
 
     extern VisionConfig vision_cfg;
