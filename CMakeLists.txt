@@ -71,6 +71,7 @@ add_executable(
 )
 
 add_subdirectory(src)
+add_subdirectory(3rdparty)
 
 if(BUILD_DESKTOP_DEBUG)
     message("BUILD_DESKTOP_DEBUG")

@@ -23,11 +23,13 @@ else()
                         pthread
                         rtsp
                         rga
+                        yolov8_pose
                         )
 
     target_include_directories(rcj_ww_vision_lib PRIVATE                        
                                 ${OpenCV_INCLUDE_DIRS}
                                 ${PROJECT_SOURCE_DIR}/include
+                                ${PROJECT_SOURCE_DIR}/3rdparty/yolov8_pose
                                 ${LUCKFOX_RKMPI_PATH}
                                 ${LUCKFOX_RKMPI_PATH}/utils
                                 ${LUCKFOX_RKMPI_PATH}/common 
