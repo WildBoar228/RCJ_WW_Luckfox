@@ -46,6 +46,10 @@
 - `--detect-mode=<mode>`: режим детектора, доступно 2:
   - `thr-blobs` (по умолчанию): поиск блобов по цветовым диапазонам
   - `yolo-pose`: модель yolo11n-pose, предсказывает ворота с 2 ключевыми точками (левый/правый угол). В режиме DESKTOP_DEBUG на данный момент ничего не делает
+- `--UART-test-mode`/`--no-UART-test-mode`: тестовый режим, для проверки работоспособности UART канала,
+а так же работоспособности кодера/декодера
+
+
 
 ## Изменение настроек в рантайме
 
@@ -63,3 +67,8 @@
 Поместите скрипт [S99_rcj_ww.sh](https://github.com/WildBoar228/RCJ_WW_Luckfox/blob/main/S99_rcj_ww.sh) в директорию `/etc/init.d/` на Luckfox. В скрипте можно менять параметры запуска.
 
 Для отладки: вывод скрипта перенаправлен в `/var/log/rcj_init.log`, вывод бинарника - в `/var/log/rcj_ww_vision.log`
+
+
+## Типовые ошибки
+
+Error from tcgetattr: Inappropriate ioctl for device - Зайдите в luckfox-config, включите 3-й юарт и ребутните luckfox
