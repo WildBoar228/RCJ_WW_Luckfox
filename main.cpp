@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 #include <vector>
+#include <unistd.h>
 
 #ifdef DESKTOP_DEBUG
 #include <opencv2/videoio.hpp>
@@ -138,6 +139,7 @@ int main(int argc, char** argv) {
     vision_cfg.send_stream = GetArgvFlag(argc, argv, "stream", true);
     vision_cfg.draw_blobs = GetArgvFlag(argc, argv, "draw-blobs", true);
     bool update_runtime_cfg = GetArgvFlag(argc, argv, "runtime-cfg", true);
+    bool is_UART_test_mode = GetArgvFlag(argc, argv, "UART-test-mode", true);
     const char* detect_mode = GetArgvString(argc, argv, "detect-mode", "thr-blobs");
 
     printf("send_stream: %d\n", vision_cfg.send_stream);
@@ -166,10 +168,34 @@ int main(int argc, char** argv) {
     const char* serial_port = "/dev/ttyS3";
 
     int uart_err = SetupUart(serial_port);
+    if(uart_err != 0) {
+        std::cerr << "ERROR: Setup of Uart was fallen" << std::endl;
+        return 1;
+    }
+
 
     std::ofstream uart(serial_port, std::ios::out | std::ios::binary);
     if (uart.fail()) {
         std::cerr << "ERROR: can't write to ttyS3" << std::endl;
+        return 1;
+    }
+
+    if(is_UART_test_mode){
+        BlobInfo b1, b2;
+        printf("UART_test_mode)\n\n");
+        while (true)
+        {
+            Send2BlobInfo(uart, b1, b2);
+            b1.clos_angle = b1.left_angle = 
+            b1.right_angle = b1.center_angle = FitAngle(b1.center_angle + 1_deg);
+            b1.width = b1.width == 100_deg ? 0_deg : b1.width + 1_deg;
+
+            b2.clos_angle = b2.left_angle = 
+            b2.right_angle = b2.center_angle = FitAngle(b2.center_angle - 1_deg);
+            b2.width = b2.width == -1_deg ? 100_deg : b2.width - 1_deg;
+
+            usleep(5 * (int)1e6);
+        }
     }
 
     const char* runtime_cfg_path = "/userdata/runtime.cfg";

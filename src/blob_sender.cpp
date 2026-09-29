@@ -26,10 +26,9 @@ namespace vision {
         SerializeInt(&data[12], bi.height);
     }
 
-    void SendBlobs(
-        std::ostream& out,
-        const std::vector<std::vector<BlobGeom>>& blobs
-    ) {
+    // для того чтоб никто случайно не убил отправку сделаю отдельную функцию
+    // так же оно надо для UART-test-mode
+    void Send2BlobInfo(std::ostream& out,  BlobInfo b1,  BlobInfo b2){
         static constexpr int kSendColors = 2;
         static constexpr int kBlobInfoLen = sizeof(int16_t) * 7;
         static constexpr int kPackageLen = 2 + kSendColors * kBlobInfoLen;
@@ -38,14 +37,28 @@ namespace vision {
         data[0] = data[1] = 0xFF;
         int write_index = 2;
 
+        SerializeBlob(&data[write_index], b1);
+        write_index += kBlobInfoLen;
+        SerializeBlob(&data[write_index], b2);
+
+        out.write(data, sizeof(data));
+        out.flush();
+    }
+
+    void SendBlobs(
+        std::ostream& out,
+        const std::vector<std::vector<BlobGeom>>& blobs) {
+        static constexpr int kSendColors = 2;
+        BlobInfo BlobInfoMass[kSendColors];
+
         for (int i = 0; i < kSendColors; ++i) {
             const auto& color_blobs = blobs[i];
             if (!color_blobs.empty()) {
                 BlobInfo bi = CalcBlobInfo(color_blobs[0]);
-                SerializeBlob(&data[write_index], bi);
+                BlobInfoMass[i] = bi;
             }
-            write_index += kBlobInfoLen;
         }
+        
 
         for (const auto& color_blobs : blobs) {
             if (!color_blobs.empty()) {
@@ -70,9 +83,8 @@ namespace vision {
 
         #else
 
-        out.write(data, sizeof(data));
-        out.flush();
-
+        Send2BlobInfo(out, BlobInfoMass[0], BlobInfoMass[1]);
+        
         #endif
     }
 

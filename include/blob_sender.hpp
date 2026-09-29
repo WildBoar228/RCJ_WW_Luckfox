@@ -10,6 +10,7 @@ namespace ww {
 namespace vision {
 
     void SendBlobs(std::ostream&, const std::vector<std::vector<BlobGeom>>&);
+    void Send2BlobInfo(std::ostream& out,  BlobInfo b1,  BlobInfo b2);
 
 } // namespace vision
 } // namespace ww
