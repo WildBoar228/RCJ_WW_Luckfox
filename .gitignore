@@ -4,6 +4,7 @@
 /.github
 .env
 
-*.txt
+thresholds.txt
+commands.txt
 *.cfg
 connect.sh
