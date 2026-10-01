@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(
-    rcj_ww_vision
-    LANGUAGES C CXX
-)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Принудительно отключаем dependency-file для старого ld.bfd
+set(CMAKE_C_LINK_DEPENDS_USE_COMPILER FALSE)
+set(CMAKE_CXX_LINK_DEPENDS_USE_COMPILER FALSE)
+set(CMAKE_C_DEPFILE_FLAGS_LINKER "")
+set(CMAKE_CXX_DEPFILE_FLAGS_LINKER "")
 
 set(OPENCV_MOBILE_PATH $ENV{OPENCV_MOBILE_PATH})
 set(LUCKFOX_C_CROSS_COMPILER_PATH $ENV{LUCKFOX_C_CROSS_COMPILER_PATH})
@@ -16,34 +14,42 @@ set(LUCKFOX_RKMPI_PATH $ENV{LUCKFOX_RKMPI_PATH})
 option(BUILD_DESKTOP_DEBUG "Build for desktop" OFF)
 option(BUILD_VISION_TESTS "Enable testing" OFF)
 
-if(BUILD_DESKTOP_DEBUG)
-    find_package(OpenCV REQUIRED)
-else()
-    if(NOT DEFINED LUCKFOX_C_CROSS_COMPILER_PATH
-       OR "${LUCKFOX_CXX_CROSS_COMPILER_PATH}" STREQUAL "")
+# Компиляторы ДОЛЖНЫ объявляться ДО команды project(), иначе CMake инициализирует хостовый тулчейн
+if(NOT BUILD_DESKTOP_DEBUG)
+    if(NOT DEFINED LUCKFOX_C_CROSS_COMPILER_PATH OR "${LUCKFOX_C_CROSS_COMPILER_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "LUCKFOX_C_CROSS_COMPILER_PATH environment variable is not set.\n"
             "Update your .env (see .env.example) and export it")
     endif()
 
-    if(NOT DEFINED LUCKFOX_CXX_CROSS_COMPILER_PATH
-       OR "${LUCKFOX_CXX_CROSS_COMPILER_PATH}" STREQUAL "")
+    if(NOT DEFINED LUCKFOX_CXX_CROSS_COMPILER_PATH OR "${LUCKFOX_CXX_CROSS_COMPILER_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "LUCKFOX_CXX_CROSS_COMPILER_PATH environment variable is not set.\n"
             "Update your .env (see .env.example) and export it")
     endif()
 
-    if(NOT DEFINED OPENCV_MOBILE_PATH
-       OR "${OPENCV_MOBILE_PATH}" STREQUAL "")
+    set(CMAKE_C_COMPILER "${LUCKFOX_C_CROSS_COMPILER_PATH}")
+    set(CMAKE_CXX_COMPILER "${LUCKFOX_CXX_CROSS_COMPILER_PATH}")
+endif()
+
+project(
+    rcj_ww_vision
+    LANGUAGES C CXX
+)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+if(BUILD_DESKTOP_DEBUG)
+    find_package(OpenCV REQUIRED)
+else()
+    if(NOT DEFINED OPENCV_MOBILE_PATH OR "${OPENCV_MOBILE_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "OPENCV_MOBILE_PATH environment variable is not set.\n"
             "Update your .env (see .env.example) and export it")
     endif()
-    
-    set(CMAKE_C_COMPILER "${LUCKFOX_C_CROSS_COMPILER_PATH}")
-    set(CMAKE_CXX_COMPILER "${LUCKFOX_CXX_CROSS_COMPILER_PATH}")
 
-    set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link,${CMAKE_CURRENT_SOURCE_DIR}/lib:/usr/lib")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,-rpath-link,${CMAKE_CURRENT_SOURCE_DIR}/lib:/usr/lib")
 
     add_definitions(-DRV1106_1103)
     link_directories(${LUCKFOX_RKMPI_PATH}/lib/uclibc)
@@ -59,7 +65,6 @@ else()
 
     add_compile_options(-g -Wall
                         -DISP_HW_V30 -DRKPLATFORM=ON -DARCH64=OFF
-                        # -DROCKIVA
                         -DUAPI2
                         -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 
                         )
@@ -90,7 +95,6 @@ if(BUILD_DESKTOP_DEBUG)
         ${OpenCV_LIBS}
     )
 else()
-
     target_link_libraries(${PROJECT_NAME} rcj_ww_vision_lib ${OpenCV_LIBS})
 
     target_include_directories(${PROJECT_NAME} PRIVATE                        
@@ -112,7 +116,6 @@ else()
                                 ${LUCKFOX_RKMPI_PATH}/include/rkaiq/iq_parser_v2
                                 ${LUCKFOX_RKMPI_PATH}/include/rkaiq/smartIr
                             )
-
 endif()
 
 if (BUILD_VISION_TESTS)

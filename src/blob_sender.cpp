@@ -51,7 +51,9 @@ namespace vision {
         static constexpr int kSendColors = 2;
         BlobInfo BlobInfoMass[kSendColors];
 
-        for (int i = 0; i < kSendColors; ++i) {
+        int colors_to_process = std::min(kSendColors, static_cast<int>(blobs.size()));
+
+        for (int i = 0; i < colors_to_process; ++i) {
             const auto& color_blobs = blobs[i];
             if (!color_blobs.empty()) {
                 BlobInfo bi = CalcBlobInfo(color_blobs[0]);

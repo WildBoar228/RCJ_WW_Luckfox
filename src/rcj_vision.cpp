@@ -87,6 +87,9 @@ namespace vision {
     }
 
     void CalcAngleRange(const BlobGeom& blob, BlobInfo& bi) {
+        if (blob.vert_cnt <= 0) {
+            return; 
+        }
         Deg angles[blob.vert_cnt];
         for (int i = 0; i < blob.vert_cnt; ++i) {
             angles[i] = Rad(
