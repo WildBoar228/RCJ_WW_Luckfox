@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     vision_cfg.send_stream = GetArgvFlag(argc, argv, "stream", true);
     vision_cfg.draw_blobs = GetArgvFlag(argc, argv, "draw-blobs", true);
     bool update_runtime_cfg = GetArgvFlag(argc, argv, "runtime-cfg", true);
-    bool is_UART_test_mode = GetArgvFlag(argc, argv, "UART-test-mode", true);
+    bool is_UART_test_mode = GetArgvFlag(argc, argv, "UART-test-mode", false);
     const char* detect_mode = GetArgvString(argc, argv, "detect-mode", "thr-blobs");
 
     printf("send_stream: %d\n", vision_cfg.send_stream);
@@ -210,7 +210,7 @@ int main(int argc, char** argv) {
     yolo_cfg.keypoint_output_index = ww::vision::kDetectionHeadNum;
     yolo_cfg.anchor_count = ww::vision::kTotalAnchors;
     yolo_cfg.max_results = YoloConfig::result_capacity;
-    yolo_cfg.nms_threshold = 0.4f;
+    yolo_cfg.nms_threshold = 0.2f;
     yolo_cfg.box_threshold = ww::vision::kDetectionThreshold;
     yolo_cfg.debug_output = false;
     yolo_cfg.labels_path.clear();
@@ -255,9 +255,12 @@ int main(int argc, char** argv) {
         }
 
         ff.Fetch();
+        auto frame = ff.GetFrame();
+        if (frame.empty())
+            continue;
 
         if (vision_cfg.detect_mode == DetectMode::kThresholdBlobs) {
-            auto blobs = bd.ReadBlobs(ff.GetFrame(), thresholds);
+            auto blobs = bd.ReadBlobs(frame, thresholds);
             
             #ifdef DESKTOP_DEBUG
             SendBlobs(std::cout, blobs);
@@ -268,18 +271,18 @@ int main(int argc, char** argv) {
             #endif
 
             if (vision_cfg.draw_blobs) {
-                bd.DrawBlobs(ff.GetFrame(), blobs);
+                bd.DrawBlobs(frame, blobs);
             }
         } else if (vision_cfg.detect_mode == DetectMode::kYoloSegments) {
             #ifndef DESKTOP_DEBUG
             auto gates_opt = gate_detector.Detect(
-                ff.GetFrame(),
+                frame,
                 ff.GetFrameFd()
             );
 
             if (vision_cfg.draw_blobs) {
                 if (gates_opt) {
-                    gate_detector.DrawResult(ff.GetFrame(), *gates_opt);
+                    gate_detector.DrawResult(frame, *gates_opt);
                 }
             }
             #endif
