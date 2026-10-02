@@ -2,18 +2,26 @@
 #include <iostream>
 #include <vector>
 
+#include "crc.hpp"
 #include "rcj_vision.hpp"
 #include "blob_sender.hpp"
 
 namespace ww {
 namespace vision {
 
+    // Big-endian, 2 байта, старший бит под знак
     void SerializeInt(char* data, int val) {
         data[0] = (abs(val) >> 8) & 0xFF;
         data[1] = abs(val) & 0xFF;
         if (val < 0) {
             data[0] |= 0x80;
         }
+    }
+
+    // Little-endian
+    void SerializeUint(char* data, uint16_t val) {
+        data[0] = val & 0xFF;
+        data[1] = (val >> 8) & 0xFF;
     }
 
     void SerializeBlob(char* data, const BlobInfo& bi) {
@@ -31,7 +39,7 @@ namespace vision {
     void Send2BlobInfo(std::ostream& out,  BlobInfo b1,  BlobInfo b2){
         static constexpr int kSendColors = 2;
         static constexpr int kBlobInfoLen = sizeof(int16_t) * 7;
-        static constexpr int kPackageLen = 2 + kSendColors * kBlobInfoLen;
+        static constexpr int kPackageLen = 2 + kSendColors * kBlobInfoLen + 2;
         static char data[kPackageLen];
         memset(data, 0, sizeof(data));
         data[0] = data[1] = 0xFF;
@@ -40,6 +48,9 @@ namespace vision {
         SerializeBlob(&data[write_index], b1);
         write_index += kBlobInfoLen;
         SerializeBlob(&data[write_index], b2);
+
+        uint16_t crc_code = crc::Encode(data + 2, kPackageLen - 4);
+        SerializeUint(&data[kPackageLen - 2], crc_code);
 
         out.write(data, sizeof(data));
         out.flush();

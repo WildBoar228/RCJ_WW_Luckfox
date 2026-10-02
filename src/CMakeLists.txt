@@ -3,6 +3,7 @@ add_library(
     blob_sender.cpp
     rcj_neurovision.cpp
     rcj_vision.cpp
+    crc.cpp
 
     luckfox_mpi.cc
 )
@@ -52,6 +53,7 @@ target_include_directories(
     rcj_ww_vision_lib
     PRIVATE
     "${PROJECT_SOURCE_DIR}/include"
+    "${PROJECT_SOURCE_DIR}/3rdparty/cppcrc"
     ${OpenCV_INCLUDE_DIRS}
 )
 
