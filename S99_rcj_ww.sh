@@ -1,5 +1,7 @@
 #!/bin/sh
 
+export PATH=$PATH:/oem/usr/bin/
+
 DELAY=5
 
 start() {
