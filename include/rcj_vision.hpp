@@ -105,6 +105,9 @@ namespace vision {
             cv::Scalar(200, 0, 0)
         };
         DetectMode detect_mode;
+
+        Deg gate_angle_offset = 90_deg;
+        bool invert_gate_angle = true;
     };
 
     extern VisionConfig vision_cfg;

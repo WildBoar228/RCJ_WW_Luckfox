@@ -2,6 +2,7 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -147,8 +148,10 @@ int main(int argc, char** argv) {
     printf("detect_mode: %s\n", detect_mode);
 
     if (strcmp(detect_mode, "thr-blobs") == 0) {
+        std::cout << "thr-blobs mode" << std::endl;
         vision_cfg.detect_mode = DetectMode::kThresholdBlobs;
     } else if (strcmp(detect_mode, "yolo-pose") == 0) {
+        std::cout << "yolo-pose mode" << std::endl;
         #ifdef DESKTOP_DEBUG
         printf("WARNING: yolo-pose mode doesn't detect anything on DESKTOP_DEBUG\n");
         #endif
@@ -215,7 +218,10 @@ int main(int argc, char** argv) {
     yolo_cfg.debug_output = false;
     yolo_cfg.labels_path.clear();
 
-    GateSegmentDetector gate_detector(const_cast<char*>(gate_model_path));
+    std::unique_ptr<GateSegmentDetector> gate_detector;
+    if (vision_cfg.detect_mode == DetectMode::kYoloSegments) {
+        gate_detector = std::make_unique<GateSegmentDetector>(const_cast<char*>(gate_model_path));
+    }
 
     #endif
 
@@ -235,6 +241,7 @@ int main(int argc, char** argv) {
     auto cfg_update_interval = std::chrono::seconds(2);
 
     while (true) {
+        printf(".\n");
         if (update_runtime_cfg) {
             if (clock.now() - cfg_update_time > cfg_update_interval) {
                 auto cfg_opt = ReadRuntimeCfg(runtime_cfg_path);
@@ -275,14 +282,14 @@ int main(int argc, char** argv) {
             }
         } else if (vision_cfg.detect_mode == DetectMode::kYoloSegments) {
             #ifndef DESKTOP_DEBUG
-            auto gates_opt = gate_detector.Detect(
+            auto gates_opt = gate_detector->Detect(
                 frame,
                 ff.GetFrameFd()
             );
 
             if (vision_cfg.draw_blobs) {
                 if (gates_opt) {
-                    gate_detector.DrawResult(frame, *gates_opt);
+                    gate_detector->DrawResult(frame, *gates_opt);
                 }
             }
             #endif

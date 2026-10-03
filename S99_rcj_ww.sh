@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DELAY=2
+DELAY=5
 
 start() {
     export LD_LIBRARY_PATH=/oem/usr/lib:$LD_LIBRARY_PATH

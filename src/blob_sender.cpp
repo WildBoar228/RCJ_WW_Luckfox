@@ -8,6 +8,15 @@
 namespace ww {
 namespace vision {
 
+    uint16_t FitAngle(uint16_t angle) {
+        angle = (angle % 360 + 360) % 360;
+        if (angle > 180) {
+            angle -= 360;
+        }
+        return angle;
+    }
+
+    // Big-endian, 2 байта, старший бит под знак
     void SerializeInt(char* data, int val) {
         data[0] = (abs(val) >> 8) & 0xFF;
         data[1] = abs(val) & 0xFF;
@@ -26,6 +35,29 @@ namespace vision {
         SerializeInt(&data[12], bi.height);
     }
 
+    void ApplyOffsetToAngle(Deg& angle) {
+        if (angle == 360_deg) {
+            return;
+        }
+
+        if (vision_cfg.invert_gate_angle) {
+            angle = FitAngle(-angle);
+        }
+
+        angle = FitAngle(angle + vision_cfg.gate_angle_offset);
+    }
+
+    void ApplyOffsetToBlob(BlobInfo& bi) {
+        ApplyOffsetToAngle(bi.left_angle);
+        ApplyOffsetToAngle(bi.right_angle);
+        ApplyOffsetToAngle(bi.center_angle);
+        ApplyOffsetToAngle(bi.clos_angle);
+
+        if (vision_cfg.invert_gate_angle) {
+            std::swap(bi.left_angle, bi.right_angle);
+        }
+    }
+
     // для того чтоб никто случайно не убил отправку сделаю отдельную функцию
     // так же оно надо для UART-test-mode
     void Send2BlobInfo(std::ostream& out,  BlobInfo b1,  BlobInfo b2){
@@ -36,6 +68,9 @@ namespace vision {
         memset(data, 0, sizeof(data));
         data[0] = data[1] = 0xFF;
         int write_index = 2;
+
+        ApplyOffsetToBlob(b1);
+        ApplyOffsetToBlob(b2);
 
         SerializeBlob(&data[write_index], b1);
         write_index += kBlobInfoLen;
